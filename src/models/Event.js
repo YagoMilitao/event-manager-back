@@ -9,16 +9,24 @@ const OrganizerSchema = new mongoose.Schema({
   instagram: String,
 });
 
+const imageSchema = new mongoose.Schema({
+  data: String, // base64
+  contentType: String, // tipo do arquivo
+});
+
 const EventSchema = new mongoose.Schema({
   nome: { type: String, required: true },
   horaInicio: { type: Number, required: true },
+  horaFim: Number,
   traje: String,
-  local: String,
+  local: { type: String, required: true },
   preco: String,
+  data: { type: String, required: true }, // data no formato YYYY-MM-DD
   descricao: String,
-  imagens: [String],
+  imagens: [imageSchema],
+  userId: { type: String, required: true }, // UID do Firebase
+  criador: { type: String, required: true }, // UID do criador
   organizadores: [OrganizerSchema],
-  criador: { type: String, required: true } 
 }, { timestamps: true });
 
 module.exports = mongoose.model("Event", EventSchema);

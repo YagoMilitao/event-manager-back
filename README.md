@@ -24,10 +24,11 @@ Rotas públicas:
 - `GET /api/events` — lista todos os eventos
 
 Rotas privadas (requerem token):
+- `GET /api/test-auth`
 - `POST /api/events`
+- `POST /api/events/create-with-images`
 - `PUT /api/events/:id`
 - `DELETE /api/events/:id`
-
 ---
 
 ## 📄 Variáveis de ambiente (.env)
