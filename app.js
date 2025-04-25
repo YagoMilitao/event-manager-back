@@ -1,9 +1,9 @@
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
-//const xssClean = require("xss-clean");
+const xssClean = require("xss-clean");
 const morgan = require("morgan");
-
+const swaggerDocs = require("./src/swagger");
 const sanitizeMiddleware = require("./src/middlewares/sanitize");
 const rateLimit = require("express-rate-limit");
 const dotenv = require("dotenv");
@@ -13,6 +13,8 @@ const errorHandler = require("./src/middlewares/errorHandler");
 
 dotenv.config();
 const app = express();
+
+swaggerDocs(app); // Configuração do Swagger
 
 // ✅ Segurança: Headers
 app.use(helmet());
@@ -39,6 +41,7 @@ app.use(cors({
 // 🔽 Esses dois devem vir antes do xss-clean!
 app.use(express.json());
 app.use(express.urlencoded({ extended: true })); // Adicionado para lidar com form-data e outros tipos
+app.use(xssClean());
 
 
 

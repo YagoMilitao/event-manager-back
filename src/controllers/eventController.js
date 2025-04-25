@@ -1,5 +1,14 @@
 const Event = require("../models/Event");
-const { bucket } = require("../auth/firebase"); 
+const { createEventSchema } = require("../validations/eventValidation");
+
+// 🛠️ Função auxiliar para converter imagens do multer em base64
+const processImages = (files) => {
+  return files.map((file) => ({
+    data: file.buffer.toString("base64"),
+    contentType: file.mimetype,
+  }));
+};
+
 // Criar novo evento(private)
 const createEvent = async (req, res, next) => {
   try {
@@ -33,6 +42,12 @@ const createEvent = async (req, res, next) => {
 // 📦 Criar evento com imagens (multipart/form-data)
 const createEventWithImages = async (req, res, next) => {
   try {
+    console.log("📥 Dados recebidos (multipart):", req.body);
+    console.log("🖼️ Imagens recebidas:", req.files);
+
+    // 🔄 Convertendo imagens do multer para base64
+    const imagensConvertidas = req.files ? processImages(req.files) : [];
+
     const files = req.files || [];
     const { nome, horaInicio, data, local } = req.body;
 
@@ -44,12 +59,27 @@ const createEventWithImages = async (req, res, next) => {
       return res.status(400).json({ message: "Imagem obrigatória" });
     }
 
-    const uploadedUrls = [];
+    // 🛡️ Validação dos campos do body com Joi
+    const { error, value } = createEventSchema.validate(
+      {
+        ...req.body,
+        imagens: imagensConvertidas, // insere imagens para validação também
+      },
+      { abortEarly: false } // mostra todos os erros de uma vez
+    );
+    if (error) {
+      // 🔴 Se houver erros de validação, envia uma resposta 400 com detalhes
+      return res.status(400).json({
+        message: "Erro de validação",
+        errors: error.details.map((err) => err.message),
+      });
+    }
 
-    const imageObjects = files.map((file) => ({
+    // 🖼️ Processar as imagens recebidas via multer
+    const imageObjects = req.files?.map((file) => ({
       data: file.buffer.toString("base64"),
       contentType: file.mimetype,
-    }));
+    })) || [];
 
     // 📌 Criação do novo evento
     const newEvent = new Event({
@@ -67,12 +97,8 @@ const createEventWithImages = async (req, res, next) => {
     });
 
   } catch (err) {
-    console.error("🔥 ERRO AO CRIAR EVENTO COM IMAGENS:", err);
-    next({
-      statusCode: 500,
-      message: "Erro ao criar evento com imagens",
-      stack: err.stack,
-    });
+    console.error("❌ ERRO AO CRIAR EVENTO COM IMAGENS:", err);
+    next(err);
   }
 };
 
@@ -159,8 +185,13 @@ const updateEvent = async (req, res, next) => {
     Object.assign(event, req.body);
     await event.save();
 
+    // Atualização do evento
+    const updatedEvent = await Event.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+    });
+
     // Retorna o evento atualizado
-    res.status(200).json(event);
+    res.status(200).json(updatedEvent);
   } catch (err) {
     console.error("🔥 ERRO AO ATUALIZAR EVENTO:", err);
     next({ 
@@ -190,7 +221,8 @@ const deleteEvent = async (req, res, next) => {
         });
     }
 
-    await event.deleteOne();
+    // Deletando o evento
+    await Event.findByIdAndDelete(req.params.id);
     res.status(200).json({ 
         message: "Evento deletado com sucesso" 
     });
