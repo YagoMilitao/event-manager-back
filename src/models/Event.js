@@ -1,32 +1,85 @@
 const mongoose = require("mongoose");
 
 const OrganizerSchema = new mongoose.Schema({
-  nome: String,
-  email: String,
-  whatsapp: String,
-  facebook: String,
-  twitter: String,
-  instagram: String,
+  nome: {
+    type: String,
+    required: true,
+    minlength: 2,
+    maxlength: 100
+  },
+  email: {
+    type: String
+  },
+  whatsapp: {
+    type: String
+  },
+  facebook: {
+    type: String
+  },
+  twitter: {
+    type: String
+  },
+  instagram: {
+    type: String
+  }
 });
 
-const imageSchema = new mongoose.Schema({
-  data: String, // base64
-  contentType: String, // tipo do arquivo
+const ImageSchema = new mongoose.Schema({
+  data: {
+    type: String, // Base64
+    required: true
+  },
+  contentType: {
+    type: String, // image/jpeg, image/png, image/webp
+    required: true
+  }
 });
 
 const EventSchema = new mongoose.Schema({
-  nome: { type: String, required: true },
-  horaInicio: { type: Number, required: true },
-  horaFim: Number,
-  traje: String,
-  local: { type: String, required: true },
-  preco: String,
-  data: { type: String, required: true }, // data no formato YYYY-MM-DD
-  descricao: String,
-  imagens: [imageSchema],
+  nome: {
+    type: String,
+    required: true,
+    minlength: 3,
+    maxlength: 100
+  },
+  descricao: {
+    type: String,
+    default: "Sem descrição informada."
+  },
+  data: {
+    type: Date,
+    required: true
+  },
+  horaInicio: {
+    type: Number,
+    required: true
+  },
+  horaFim: {
+    type: Number
+  },
+  traje: {
+    type: String,
+    default: "Livre"
+  },
+  local: {
+    type: String,
+    required: true,
+    minlength: 3
+  },
+  preco: {
+    type: String,
+    default: "0"
+  },
+  imagens: {
+    type: [ImageSchema],
+    default: []
+  },
   userId: { type: String, required: true }, // UID do Firebase
   criador: { type: String, required: true }, // UID do criador
-  organizadores: [OrganizerSchema],
+  organizadores: {
+    type: [OrganizerSchema],
+    default: []
+  },
 }, { timestamps: true });
 
 module.exports = mongoose.model("Event", EventSchema);

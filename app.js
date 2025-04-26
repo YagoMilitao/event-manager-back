@@ -8,8 +8,9 @@ const sanitizeMiddleware = require("./src/middlewares/sanitize");
 const rateLimit = require("express-rate-limit");
 const dotenv = require("dotenv");
 const eventRoutes = require("./src/routes/events");
-const testAuthRoute = require("./src/routes/test");
+const testAuthRoute = require("./src/routes/testTokenRoutejs");
 const errorHandler = require("./src/middlewares/errorHandler");
+const healthRoute = require("./src/routes/dbHealth");
 
 dotenv.config();
 const app = express();
@@ -41,7 +42,7 @@ app.use(cors({
 // 🔽 Esses dois devem vir antes do xss-clean!
 app.use(express.json());
 app.use(express.urlencoded({ extended: true })); // Adicionado para lidar com form-data e outros tipos
-app.use(xssClean());
+
 
 
 
@@ -66,6 +67,7 @@ app.use(morgan("dev"));
 //Rotas
 app.use("/api/events", eventRoutes);
 app.use("/api/test-auth", testAuthRoute);
+app.use("/health", healthRoute);
 app.use("/uploads", express.static("uploads"));
 
 // ✅ Middleware de erro (deve vir por último)

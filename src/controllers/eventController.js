@@ -1,5 +1,10 @@
 const Event = require("../models/Event");
 const { createEventSchema } = require("../validations/eventValidation");
+const { sendEmail } = require('../services/emailService');
+const generateEventCreatedEmail = require('../services/emailTemplates/generateEventCreatedEmail');
+const generateEventUpdatedEmail = require('../services/emailTemplates/generateEventUpdatedEmail');
+const generateEventDeletedEmail = require('../services/emailTemplates/generateEventDeletedEmail');
+
 
 // 🛠️ Função auxiliar para converter imagens do multer em base64
 const processImages = (files) => {
@@ -12,32 +17,70 @@ const processImages = (files) => {
 // Criar novo evento(private)
 const createEvent = async (req, res, next) => {
   try {
+    const { error, value } = createEventSchema.validate(req.body, { abortEarly: false });
 
-    const { error } = createEventSchema.validate(req.body);
     if (error) {
+      const errorMessages = error.details.map(err => err.message);
       return next({
         statusCode: 400,
         message: error.details[0].message,
       });
     }
+
     // Criação de um novo event com o UID do usuário autenticado
     const newEvent = new Event({
       ...req.body,
+      preco: value.preco || "0",
+      traje: value.traje || "Livre",
+      descricao: value.descricao || "Sem descrição informada.",
       userId: req.user.uid,
       criador: req.user.uid, // ✅ Pegando do token decodificado
     });
 
     const savedEvent = await newEvent.save();
-    res.status(201).json(savedEvent);
+    // Aqui você salva o evento no banco
+    // const novoEvento = new EventModel(evento);
+    // await novoEvento.save();
+
+    const { eventName } = req.body;
+    const { criador } = req.user.uid;//Nome do usuário autenticado
+
+    const htmlContent = generateEventCreatedEmail(
+      criador, 
+      eventName, 
+      `https://seusite.com/eventos/${savedEvent._id}` // 🔥 Corrigido: era 'eventoCriado' que não existia, agora é 'savedEvent'
+    );
+
+    // ✅ Primeiro responde ao client
+    res.status(201).json({
+      message: "Evento criado com sucesso e email sendo enviado!",
+      evento: savedEvent,
+    });
+
+    // ✅ Depois envia o email em background (sem travar o client)
+    setImmediate(async () => {
+      try {
+        await sendEmail({
+          to: req.user.email,
+          subject: `Seu evento "${eventName}" foi criado!`,
+          html: htmlContent,
+        });
+        console.log(`📧 E-mail enviado com sucesso para "${criador}" com o email "${req.user.email}"`);
+      } catch (error) {
+        console.error('⚠️ Falha ao enviar e-mail em background:', error);
+      }
+    });
+
   } catch (err) {
     console.error("🔥 ERRO AO CRIAR EVENTO:", err);
     next({ 
-        statusCode: 500, 
-        message: "Erro ao criar evento", 
-        stack: err.stack 
+      statusCode: 500, 
+      message: "Erro ao criar evento", 
+      stack: err.stack 
     });
   }
 };
+
 
 // 📦 Criar evento com imagens (multipart/form-data)
 const createEventWithImages = async (req, res, next) => {
@@ -84,6 +127,9 @@ const createEventWithImages = async (req, res, next) => {
     // 📌 Criação do novo evento
     const newEvent = new Event({
       ...req.body,
+      preco: value.preco && value.preco.trim() !== "" ? value.preco : "0",
+      traje: value.traje && value.traje.trim() !== "" ? value.traje : "Livre",
+      descricao: value.descricao && value.descricao.trim() !== "" ? value.descricao : "Sem descrição informada.",
       imagens: imageObjects,
       criador: req.user.uid,
       userId: req.user.uid,
@@ -190,6 +236,23 @@ const updateEvent = async (req, res, next) => {
       new: true,
     });
 
+    const { nome } = req.body;
+
+    const htmlContent = generateEventUpdatedEmail
+    (
+      req.user.name,
+      nome,
+      `https://seusite.com/eventos/${updatedEvent._id}`
+    );
+
+
+    await sendEmail({
+      to: req.user.email, // ou quem você quiser
+      subject: 'Evento Atualizado!',
+      text: `Seu evento "${nome}" foi atualizado!`,
+      html: htmlContent,
+    });
+
     // Retorna o evento atualizado
     res.status(200).json(updatedEvent);
   } catch (err) {
@@ -223,6 +286,23 @@ const deleteEvent = async (req, res, next) => {
 
     // Deletando o evento
     await Event.findByIdAndDelete(req.params.id);
+
+    const { nome } = req.body;
+
+    const htmlContent = generateEventDeletedEmail
+    (
+      req.user.name,
+      nome, 
+      `https://seusite.com/eventos/${event._id}`
+    );
+
+
+    await sendEmail({
+      to: req.user.email, // ou quem você quiser
+      subject: 'Evento deletado!',
+      text: `Seu evento "${nome}" foi deletado!`,
+      html: htmlContent,
+    });
     res.status(200).json({ 
         message: "Evento deletado com sucesso" 
     });

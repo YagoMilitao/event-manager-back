@@ -22,8 +22,8 @@ router.post("/", verifyToken, createEvent);
 router.post(
   "/create-with-images",
   verifyToken, // ✅ Garante que o usuário tem um token válido
-  sanitizeInputs,  // Middleware para sanitizar os dados
   upload, // ✅ Faz o parse de imagens do multipart/form-data
+  sanitizeInputs,  // Middleware para sanitizar os dados
   createEventWithImages  //✅ Controller que salva o evento + imagens
 );
 /**

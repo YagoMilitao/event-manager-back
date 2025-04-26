@@ -42,9 +42,9 @@ const imageSchema = Joi.object({
 const createEventSchema = Joi.object({
   nome: Joi.string().min(3).max(100).required().messages({
     "any.required": "O título é obrigatório.",
-    "string.base": "O título deve ser uma string."
+    "string.base": "O título deve ser uma string.",
   }),
-  descricao: Joi.string().allow("").optional(),
+  descricao: Joi.string().allow(null, "").optional(),
   data: Joi.date().iso().required().messages({
     "any.required": "A data é obrigatória.",
     "date.base": "Data inválida."
@@ -54,7 +54,7 @@ const createEventSchema = Joi.object({
     "number.base": "Hora de início deve ser um número (formato HHMM).",
   }),
   horaFim: Joi.number().min(0).max(2359).optional(),
-  traje: Joi.string().allow("").optional(),
+  traje: Joi.string().allow(null, "").optional(),
   local: Joi.string().required().messages({
     "any.required": "O local é obrigatório.",
     "string.base": "O local deve ser uma string."
