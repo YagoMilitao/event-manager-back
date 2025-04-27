@@ -20,7 +20,7 @@ const createEvent = async (req, res, next) => {
     const { error, value } = createEventSchema.validate(req.body, { abortEarly: false });
 
     if (error) {
-      const errorMessages = error.details.map(err => err.message);
+      // Se houver erros de validação, envia uma resposta 400 com detalhes
       return next({
         statusCode: 400,
         message: error.details[0].message,
@@ -37,18 +37,17 @@ const createEvent = async (req, res, next) => {
       criador: req.user.uid, // ✅ Pegando do token decodificado
     });
 
+    // Aqui salva o evento no banco
     const savedEvent = await newEvent.save();
-    // Aqui você salva o evento no banco
-    // const novoEvento = new EventModel(evento);
-    // await novoEvento.save();
+    
 
     const { eventName } = req.body;
-    const { criador } = req.user.uid;//Nome do usuário autenticado
+    const { criador } = req.user.uid;
 
     const htmlContent = generateEventCreatedEmail(
       criador, 
       eventName, 
-      `https://seusite.com/eventos/${savedEvent._id}` // 🔥 Corrigido: era 'eventoCriado' que não existia, agora é 'savedEvent'
+      `https://seusite.com/eventos/${savedEvent._id}`
     );
 
     // ✅ Primeiro responde ao client
@@ -167,7 +166,7 @@ const getAllEvents = async (req, res, next) => {
 const getMyEvents = async (req, res, next) => {
   try {
     const userEvent = await Event.find({
-         criador: req.user.uid // UID do usuário autenticado
+         criador: req.user.uid 
     });
     res.status(200).json(userEvent);
   } catch (err) {

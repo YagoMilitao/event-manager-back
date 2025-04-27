@@ -8,9 +8,10 @@ const sanitizeMiddleware = require("./src/middlewares/sanitize");
 const rateLimit = require("express-rate-limit");
 const dotenv = require("dotenv");
 const eventRoutes = require("./src/routes/events");
-const testAuthRoute = require("./src/routes/testTokenRoutejs");
+const testAuthRoute = require("./src/routes/testTokenRoute.js");
 const errorHandler = require("./src/middlewares/errorHandler");
 const healthRoute = require("./src/routes/dbHealth");
+const authRoutes = require('./src/routes/auth'); 
 
 dotenv.config();
 const app = express();
@@ -65,6 +66,7 @@ app.use(limiter);
 app.use(morgan("dev"));
 
 //Rotas
+app.use('/auth', authRoutes);
 app.use("/api/events", eventRoutes);
 app.use("/api/test-auth", testAuthRoute);
 app.use("/health", healthRoute);
