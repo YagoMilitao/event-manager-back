@@ -31,4 +31,16 @@ const verifyToken = async (req, res, next) => {
   }
 };
 
-module.exports = verifyToken;
+async function decodeToken(token) {
+  try {
+    const decoded = await admin.auth().verifyIdToken(token);
+    return decoded;
+  } catch (error) {
+    throw error;
+  }
+}
+
+module.exports = {
+  verifyToken, 
+  decodeToken
+};

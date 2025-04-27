@@ -1,61 +1,27 @@
-// routes/auth.js
 const express = require('express');
-const bcryptjs = require('bcryptjs');
-const User = require('../models/User');
-const { body, validationResult } = require('express-validator');
+const { registerUser, loginUser } = require('../controllers/userController');
+const { decodeToken } = require("../middlewares/authMiddleware");
 
 const router = express.Router();
 
-// 🎯 Rota de Signup
-router.post('/signup',
-  // Validação dos campos
-  body('email').isEmail().withMessage('Email inválido').normalizeEmail(),
-  body('password')
-    .isLength({ min: 6 })
-    .withMessage('A senha deve ter pelo menos 6 caracteres'),
-  body('name').notEmpty().withMessage('Nome é obrigatório'),
+router.post('/register', registerUser);
+router.post('/login', loginUser);
 
-  async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
+router.get('/test-token', async (req, res) => {
+  const authHeader = req.headers.authorization;
 
-    const { name, email, password } = req.body;
-
-    try {
-      // Verifica se o email já existe no banco
-      const existingUser = await User.findOne({ email });
-      if (existingUser) {
-        return res.status(400).json({ message: 'Email já está em uso.' });
-      }
-
-      // Criptografa a senha
-      const salt = await bcryptjs.genSalt(10);
-      const hashedPassword = await bcryptjs.hash(password, salt);
-
-      // Cria o usuário
-      const newUser = new User({
-        name,
-        email,
-        passwordHash: hashedPassword,
-      });
-
-      await newUser.save();
-
-      // Responde ao cliente
-      res.status(201).json({
-        message: 'Usuário cadastrado com sucesso!',
-        user: {
-          name: newUser.name,
-          email: newUser.email,
-        },
-      });
-    } catch (err) {
-      console.error('🔥 ERRO AO CRIAR USUÁRIO:', err);
-      res.status(500).json({ message: 'Erro ao criar o usuário' });
-    }
+  if (!authHeader) {
+    return res.status(401).json({ message: 'Token não enviado.' });
   }
-);
 
+  const token = authHeader.split(' ')[1]; // pega só o token, tirando o "Bearer "
+
+  try {
+    const decodedToken = await decodeToken(token);
+    res.status(200).json({ message: 'Token válido!', decodedToken });
+  } catch (err) {
+    console.error('Erro ao verificar token:', err);
+    res.status(401).json({ message: 'Token inválido.' });
+  }
+});
 module.exports = router;
