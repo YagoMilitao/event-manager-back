@@ -17,6 +17,12 @@ const { registerUser, loginUser } = require('./src/controllers/userController');
 dotenv.config();
 const app = express();
 
+// Rota para a raiz do app 
+app.get("/", (req, res) => {
+  res.send("Bem-vindo ao Event Manager API!");
+});
+
+
 swaggerDocs(app); // Configuração do Swagger
 
 // ✅ Segurança: Headers
@@ -67,6 +73,7 @@ app.use(limiter);
 app.use(morgan("dev"));
 
 //Rotas
+
 app.use('/auth', authRoutes);
 app.use("/api/events", eventRoutes);
 app.use("/api/test-auth", testAuthRoute);
