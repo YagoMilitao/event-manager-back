@@ -162,6 +162,20 @@ const getAllEvents = async (req, res, next) => {
   }
 };
 
+const getEventById = async (req, res, next) => {
+  try {
+    const event = await Event.findById(req.params.id);
+    res.status(200).json(event);
+  } catch (err) {
+    console.error("🔥 ERRO AO MOSTRAR O EVENTO:", err);
+    next({
+         statusCode: 500, 
+         message: "Erro ao buscar evento", 
+         stack: err.stack 
+    });
+  }
+};
+
 // Buscar eventos do usuário autenticado
 const getMyEvents = async (req, res, next) => {
   try {
@@ -319,6 +333,7 @@ module.exports = {
   createEvent,
   createEventWithImages,
   getAllEvents,
+  getEventById,
   getMyEvents,
   getImage,
   updateEvent,

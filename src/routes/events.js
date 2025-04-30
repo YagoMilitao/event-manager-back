@@ -6,6 +6,7 @@ const {
   createEvent,
   createEventWithImages,
   getAllEvents,
+  getEventById,
   getMyEvents,
   getImage,
   updateEvent,
@@ -37,6 +38,8 @@ router.post(
  */
 // 📌 Buscar todos os eventos (público)
 router.get("/", getAllEvents);
+
+router.get('/:id', getEventById); 
 // 📌 Buscar eventos do usuário autenticado
 router.get("/my-event", verifyToken, getMyEvents);
 // Obter imagem de evento
