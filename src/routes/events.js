@@ -18,7 +18,7 @@ const sanitizeInputs = require("../middlewares/sanitizationMiddleware");
 
 
 // 📌 Criar evento (sem imagens)
-router.post("/", verifyToken, createEvent);
+router.post("/create-event", verifyToken, createEvent);
 // 📌 Criar evento com imagens
 router.post(
   "/create-with-images",
@@ -39,9 +39,10 @@ router.post(
 // 📌 Buscar todos os eventos (público)
 router.get("/", getAllEvents);
 
-router.get('/:id', getEventById); 
 // 📌 Buscar eventos do usuário autenticado
 router.get("/my-event", verifyToken, getMyEvents);
+router.get('/:id', getEventById); 
+
 // Obter imagem de evento
 router.get("/image/:id", getImage);
 // 📌 Atualizar evento
