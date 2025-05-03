@@ -64,21 +64,56 @@ const createEvent = async (req, res, next) => {
 // Criar evento com imagens (multipart/form-data)
 const createEventWithImages = async (req, res, next) => {
   try {
-    const imagensConvertidas = req.files ? processImages(req.files) : [];
+    const convertImages = req.files ? processImages(req.files) : [];
 
-    const { nome, horaInicio, data, local } = req.body;
-    if (!nome || !horaInicio || !data || !local) {
-      return res.status(400).json({ message: "Dados obrigatórios ausentes" });
+    // Parse campos que chegam como string (devido ao multipart/form-data)
+    const nome = req.body.nome?.toString();
+    console.log("req.body.nome", nome);
+    const descricao = req.body.descricao?.toString() || "Sem descrição informada.";
+    console.log("req.body.descricao", descricao);
+    const data = req.body.data?.toString();
+    console.log("req.body.data", data);
+    const horaInicio = Number(req.body.horaInicio);
+    console.log("req.body.horaInicio", horaInicio);
+    const horaFim = req.body.horaFim ? Number(req.body.horaFim) : undefined;
+    console.log("req.body.horaFim", horaFim);
+    const local = req.body.local?.toString();
+    console.log("req.body.local", local);
+    const traje = req.body.traje?.toString() || "Livre";
+    console.log("req.body.traje", traje);
+    const preco = req.body.preco?.toString() || "0";
+    console.log("req.body.preco", preco);
+
+    // Parse do array de organizadores (já estava correto)
+    const rawOrganizadores = req.body.organizadores;
+    let parsedOrganizadores = [];
+    if (rawOrganizadores) {
+      try {
+        parsedOrganizadores = JSON.parse(rawOrganizadores);
+      } catch (err) {
+        return res.status(400).json({
+          message: "Formato inválido para organizadores. Deve ser um JSON válido.",
+        });
+      }
     }
 
-    if (!req.files || req.files.length === 0) {
-      return res.status(400).json({ message: "Imagem obrigatória" });
-    }
+    const eventData = {
+      nome,
+      descricao,
+      data,
+      horaInicio,
+      horaFim,
+      local,
+      traje,
+      preco,
+      organizadores: parsedOrganizadores,
+      images: convertImages,
+    };
 
-    const { error, value } = createEventSchema.validate(
-      { ...req.body, imagens: imagensConvertidas },
-      { abortEarly: false }
-    );
+    // Validação com Joi
+    const { error, value } = createEventSchema.validate(eventData, {
+      abortEarly: false,
+    });
 
     if (error) {
       return res.status(400).json({
@@ -88,11 +123,8 @@ const createEventWithImages = async (req, res, next) => {
     }
 
     const newEvent = new Event({
-      ...req.body,
-      preco: value.preco?.trim() || "0",
-      traje: value.traje?.trim() || "Livre",
-      descricao: value.descricao?.trim() || "Sem descrição informada.",
-      imagens: imagensConvertidas,
+      ...value,
+      images: convertImages,
       criador: req.user.uid,
       userId: req.user.uid,
     });
@@ -108,6 +140,7 @@ const createEventWithImages = async (req, res, next) => {
     next(err);
   }
 };
+
 
 // Buscar todos os eventos
 const getAllEvents = async (req, res, next) => {
@@ -171,7 +204,7 @@ const updateEvent = async (req, res, next) => {
     const htmlContent = generateEventUpdatedEmail(
       req.user.name,
       req.body.nome,
-      `https://seusite.com/eventos/${updatedEvent._id}`
+      `http://event-manager-back.onrender.com/api/events/${updatedEvent._id}`
     );
 
     await sendEmail({
@@ -198,14 +231,14 @@ const deleteEvent = async (req, res, next) => {
 
     const htmlContent = generateEventDeletedEmail(
       req.user.name,
-      req.body.nome,
-      `https://seusite.com/eventos/${event._id}`
+      event.nome,
+      `http://event-manager-back.onrender.com/api/events/${event._id}`
     );
 
     await sendEmail({
       to: req.user.email,
       subject: 'Evento deletado!',
-      text: `Seu evento \"${req.body.nome}\" foi deletado!`,
+      text: `Seu evento \"${event.nome}\" foi deletado!`,
       html: htmlContent,
     });
 

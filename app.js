@@ -1,7 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
-const xssClean = require("xss-clean");
+// const xssClean = require("xss-clean"); // Remova se não estiver usando
 const morgan = require("morgan");
 const swaggerDocs = require("./src/swagger");
 const sanitizeMiddleware = require("./src/middlewares/sanitize");
@@ -17,46 +17,42 @@ const { registerUser, loginUser } = require('./src/controllers/userController');
 dotenv.config();
 const app = express();
 
-// Rota para a raiz do app 
+// Rota para a raiz do app
 app.get("/", (req, res) => {
   res.send("Bem-vindo ao Event Manager API!");
 });
-
 
 swaggerDocs(app); // Configuração do Swagger
 
 // ✅ Segurança: Headers
 app.use(helmet());
 
-
 //Middlewares
 app.use(cors({
   origin: [
-    "http://localhost:5173", 
-    "http://localhost:3000", 
-    "http://10.0.2.2:3000", 
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "http://10.0.2.2:3000",
     "https://seu-dominio.com"
   ], // ajustar conforme o frontend
   methods: [
-    "GET", 
-    "POST", 
-    "PUT", 
+    "GET",
+    "POST",
+    "PUT",
     "DELETE"
   ], // métodos permitidos
   credentials: true
 }));
 
 // ✅ Parse do body da requisição
-// 🔽 Esses dois devem vir antes do xss-clean!
 app.use(express.json());
-app.use(express.urlencoded({ extended: true })); // Adicionado para lidar com form-data e outros tipos
+app.use(express.urlencoded({ extended: true }));
 
-
-
-
-// ✅ Segurança: Limpa dados maliciosos (XSS)
-// 🔽 Agora na ordem correta
-//app.use(xssClean());
+// ➡️ ADICIONE ESTE LOG AQUI!
+app.use((req, res, next) => {
+  console.log("➡️ req.body APÓS urlencoded:", req.body);
+  next();
+});
 
 // ✅ Segurança: Evita injeção de MongoDB
 app.use(sanitizeMiddleware);
@@ -73,7 +69,6 @@ app.use(limiter);
 app.use(morgan("dev"));
 
 //Rotas
-
 app.use('/auth', authRoutes);
 app.use("/api/events", eventRoutes);
 app.use("/api/test-auth", testAuthRoute);
@@ -83,4 +78,4 @@ app.use("/uploads", express.static("uploads"));
 // ✅ Middleware de erro (deve vir por último)
 app.use(errorHandler);
 
-module.exports = app; // 🔧 Corrigido o "module. Exports" para "module.exports"
+module.exports = app;

@@ -40,9 +40,9 @@ const imageSchema = Joi.object({
 
 // Validação para criação de evento
 const createEventSchema = Joi.object({
-  nome: Joi.string().min(3).max(100).required().messages({
+  nome: Joi.string().max(100).required().messages({
     "any.required": "O título é obrigatório.",
-    "string.base": "O título deve ser uma string.",
+    "string.base": "O nome do evento deve ser uma string.",
   }),
   descricao: Joi.string().allow(null, "").optional(),
   data: Joi.date().iso().required().messages({
@@ -61,7 +61,7 @@ const createEventSchema = Joi.object({
   }),
   preco: Joi.string().allow("").optional(),
   organizadores: Joi.array().items(organizerSchema).optional(),
-  imagens: Joi.array().items(imageSchema).optional().messages({
+  images: Joi.array().items(imageSchema).optional().messages({
     "array.includes": "Formato de imagem inválido.",
   }),
 });
@@ -85,7 +85,7 @@ const updateEventSchema = Joi.object({
   }),
   preco: Joi.string().allow(""),
   organizadores: Joi.array().items(organizerSchema),
-  imagens: Joi.array().items(imageSchema),
+  images: Joi.array().items(imageSchema),
 });
 
 

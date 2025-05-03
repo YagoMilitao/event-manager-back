@@ -70,7 +70,7 @@ const EventSchema = new mongoose.Schema({
     type: String,
     default: "0"
   },
-  imagens: {
+  images: {
     type: [ImageSchema],
     default: []
   },
