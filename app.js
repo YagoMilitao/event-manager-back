@@ -33,7 +33,8 @@ app.use(cors({
     "http://localhost:5173",
     "http://localhost:3000",
     "http://10.0.2.2:3000",
-    "https://event-manager-back.onrender.com"
+    "https://event-manager-back.onrender.com/api/events/create-event",
+    "https://event-manager-back.onrender.com/api/events/create-with-images",
   ], // ajustar conforme o frontend
   methods: [
     "GET",

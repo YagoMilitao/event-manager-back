@@ -15,7 +15,6 @@ const {
 const isEventOwner = require("../middlewares/isEventOwner");
 const sanitizeMiddleware = require("../middlewares/sanitize"); // Importa o middleware de sanitização
 
-
 // 📌 Criar evento (sem imagens)
 router.post("/create-event", verifyToken, sanitizeMiddleware, createEvent); // ✅ Aplica sanitização aqui
 
