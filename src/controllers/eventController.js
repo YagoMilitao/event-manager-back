@@ -64,6 +64,10 @@ const createEvent = async (req, res, next) => {
 // Criar evento com imagens (multipart/form-data)
 const createEventWithImages = async (req, res, next) => {
   try {
+    console.log("➡️ createEventWithImages chamado");
+    console.log("   req.body:", req.body);
+    console.log("   req.files:", req.files);
+
     const convertImages = req.files ? processImages(req.files) : [];
 
     // Parse campos que chegam como string (devido ao multipart/form-data)
@@ -90,7 +94,9 @@ const createEventWithImages = async (req, res, next) => {
     if (rawOrganizadores) {
       try {
         parsedOrganizadores = JSON.parse(rawOrganizadores);
+        console.log("   parsedOrganizadores:", parsedOrganizadores);
       } catch (err) {
+        console.error("   Erro ao parsear organizadores:", err);
         return res.status(400).json({
           message: "Formato inválido para organizadores. Deve ser um JSON válido.",
         });
@@ -109,6 +115,7 @@ const createEventWithImages = async (req, res, next) => {
       organizadores: parsedOrganizadores,
       images: convertImages,
     };
+    console.log("   eventData antes da validação:", eventData);
 
     // Validação com Joi
     const { error, value } = createEventSchema.validate(eventData, {
@@ -121,6 +128,7 @@ const createEventWithImages = async (req, res, next) => {
         errors: error.details.map((err) => err.message),
       });
     }
+    console.log("   Dados validados:", value);
 
     const newEvent = new Event({
       ...value,
@@ -128,8 +136,10 @@ const createEventWithImages = async (req, res, next) => {
       criador: req.user.uid,
       userId: req.user.uid,
     });
+    console.log("   Evento a ser salvo:", newEvent);
 
     const savedEvent = await newEvent.save();
+    console.log("   Evento salvo com sucesso:", savedEvent);
 
     res.status(201).json({
       message: "Evento criado com sucesso",
