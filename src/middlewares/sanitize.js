@@ -1,6 +1,6 @@
 const sanitize = require("mongo-sanitize");
 
-module.exports = function sanitizeMiddleware(req, res, next) {
+ const sanitizeMiddleware =  async (req, res, next)=> {
   // Sanitize body
   if (req.body) {
     for (let prop in req.body) {
@@ -24,3 +24,5 @@ module.exports = function sanitizeMiddleware(req, res, next) {
 
   next();
 };
+
+module.exports = sanitizeMiddleware;
