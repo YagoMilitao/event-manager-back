@@ -16,10 +16,15 @@ const processImages = (files) => {
 // Criar novo evento (sem imagens)
 const createEvent = async (req, res, next) => {
   try {
+     console.log("➡️ createEvent chamado");
+    console.log("   req.body:", req.body);
     const { error, value } = createEventSchema.validate(req.body, { abortEarly: false });
     if (error) {
+      console.error("   Erro de validação:", error.details);
       return next({ statusCode: 400, message: error.details[0].message });
     }
+
+    console.log("   Dados validados:", value);
 
     const newEvent = new Event({
       ...req.body,
@@ -29,8 +34,11 @@ const createEvent = async (req, res, next) => {
       userId: req.user.uid,
       criador: req.user.uid,
     });
+    console.log("   Evento a ser salvo:", newEvent);
+
 
     const savedEvent = await newEvent.save();
+    console.log("   Evento salvo com sucesso:", savedEvent);
 
     const htmlContent = generateEventCreatedEmail(
       req.user.uid,
