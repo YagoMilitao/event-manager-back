@@ -3,7 +3,7 @@ const transporter = require('../config/emailConfig');
 async function sendEmail({ to, subject, text, html }) {
   try {
     const info = await transporter.sendMail({
-      from: `"Event Manager" <${process.env.EMAIL_USER}>`, //process.env.EMAIL_USER,
+      from: `"Event Manager" <${process.env.EMAIL_USER}>`,
       to,
       subject,
       html,
