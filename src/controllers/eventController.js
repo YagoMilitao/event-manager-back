@@ -75,28 +75,29 @@ const createEventWithImages = async (req, res, next) => {
     console.log("➡️ createEventWithImages chamado");
     console.log("   req.body:", req.body);
     console.log("   req.files:", req.files);
+    console.log("   req.file:", req.file);
 
-    const convertImages = req.files ? processImages(req.files) : [];
+    // Garante array de arquivos, independente se for single() ou array()
+    let filesArray = [];
+    if (Array.isArray(req.files)) {
+      filesArray = req.files;
+    } else if (req.file) {
+      filesArray = [req.file];
+    }
 
-    // Parse campos que chegam como string (devido ao multipart/form-data)
+    const convertImages = filesArray.length > 0 ? processImages(filesArray) : [];
+
+    // Parse dos campos (strings vindo do multipart)
     const nome = req.body.nome?.toString();
-    console.log("req.body.nome", nome);
     const descricao = req.body.descricao?.toString() || "Sem descrição informada.";
-    console.log("req.body.descricao", descricao);
     const data = req.body.data?.toString();
-    console.log("req.body.data", data);
-    const horaInicio = Number(req.body.horaInicio);
-    console.log("req.body.horaInicio", horaInicio);
+    const horaInicio = req.body.horaInicio ? Number(req.body.horaInicio) : undefined;
     const horaFim = req.body.horaFim ? Number(req.body.horaFim) : undefined;
-    console.log("req.body.horaFim", horaFim);
     const local = req.body.local?.toString();
-    console.log("req.body.local", local);
     const traje = req.body.traje?.toString() || "Livre";
-    console.log("req.body.traje", traje);
     const preco = req.body.preco?.toString() || "0";
-    console.log("req.body.preco", preco);
 
-    // Parse do array de organizadores (já estava correto)
+    // Parse de organizadores
     const rawOrganizadores = req.body.organizadores;
     let parsedOrganizadores = [];
     if (rawOrganizadores) {
@@ -121,8 +122,9 @@ const createEventWithImages = async (req, res, next) => {
       traje,
       preco,
       organizadores: parsedOrganizadores,
-      images: convertImages,
+      images: convertImages, // opcional para Joi
     };
+
     console.log("   eventData antes da validação:", eventData);
 
     // Validação com Joi
@@ -131,6 +133,7 @@ const createEventWithImages = async (req, res, next) => {
     });
 
     if (error) {
+      console.error("   Erro de validação:", error.details);
       return res.status(400).json({
         message: "Erro de validação",
         errors: error.details.map((err) => err.message),
@@ -138,26 +141,37 @@ const createEventWithImages = async (req, res, next) => {
     }
     console.log("   Dados validados:", value);
 
+    // Monta objeto que vai pro Mongo
     const newEvent = new Event({
       ...value,
+      // se seu model usa 'imagem' único:
+      imagem: convertImages[0] || undefined,
+      // se quiser manter array também:
       images: convertImages,
       criador: req.user.uid,
       userId: req.user.uid,
     });
+
     console.log("   Evento a ser salvo:", newEvent);
 
     const savedEvent = await newEvent.save();
     console.log("   Evento salvo com sucesso:", savedEvent);
 
-    res.status(201).json({
+    return res.status(201).json({
       message: "Evento criado com sucesso",
       evento: savedEvent._id,
     });
   } catch (err) {
     console.error("❌ ERRO AO CRIAR EVENTO COM IMAGENS:", err);
-    next(err);
+    // ajuda a ver no front o problema real:
+    return next({
+      statusCode: 500,
+      message: err.message || "Erro ao criar evento com imagens",
+      stack: err.stack,
+    });
   }
 };
+
 
 
 // Buscar todos os eventos

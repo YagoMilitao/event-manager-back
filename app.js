@@ -69,7 +69,7 @@ app.use(limiter);
 app.use(morgan("dev"));
 
 //Rotas
-app.use('/auth', authRoutes);
+app.use('/auth' , authRoutes);
 app.use("/api/events", eventRoutes);
 app.use("/api/test-auth", testAuthRoute);
 app.use("/health", healthRoute);
