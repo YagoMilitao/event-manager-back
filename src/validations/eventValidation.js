@@ -67,28 +67,36 @@
   });
 
   // Validação para atualização (campos opcionais)
-  const updateEventSchema = Joi.object({
-    nome: Joi.string().min(3).max(100).messages({
-      "string.base": "O nome deve ser um texto",
-    }),
-    descricao: Joi.string().min(10).max(1000).messages({
-      "string.base": "A descrição deve ser um texto",
-    }),
-    data: Joi.string().isoDate().messages({
-      "date.base": "A data deve estar no formato ISO",
-    }),
-    horaInicio: Joi.number().min(0).max(2359),
-    horaFim: Joi.number().min(0).max(2359),
-    traje: Joi.string().allow(""),
-    local: Joi.string().min(3).max(200).messages({
-      "string.base": "O local deve ser um texto",
-    }),
-    preco: Joi.string().allow(""),
-    organizadores: Joi.array().items(organizerSchema),
-    images: Joi.array().items(imageSchema),
-  });
+const updateEventSchema = Joi.object({
+  nome: Joi.string().max(100).messages({
+    "string.base": "O nome deve ser um texto",
+  }),
 
+  // 👉 mesma regra do create: opcional e aceita vazio
+  descricao: Joi.string().allow(null, "").optional().messages({
+    "string.base": "A descrição deve ser um texto",
+  }),
 
+  // mantém ISO, mas usa o mesmo tipo do create
+  data: Joi.date().iso().messages({
+    "date.base": "A data deve estar no formato ISO",
+  }),
+
+  horaInicio: Joi.number().min(0).max(2359),
+  horaFim: Joi.number().min(0).max(2359),
+
+  traje: Joi.string().allow(""),
+
+  local: Joi.string().min(3).max(200).messages({
+    "string.base": "O local deve ser um texto",
+  }),
+
+  preco: Joi.string().allow(""),
+
+  organizadores: Joi.array().items(organizerSchema),
+
+  images: Joi.array().items(imageSchema),
+});
 
   module.exports = {
     baseEventSchema,
