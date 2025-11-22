@@ -1,7 +1,6 @@
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
-// const xssClean = require("xss-clean"); // Remova se não estiver usando
 const morgan = require("morgan");
 const swaggerDocs = require("./src/swagger");
 const sanitizeMiddleware = require("./src/middlewares/sanitize");
