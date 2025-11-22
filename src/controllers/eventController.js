@@ -219,37 +219,59 @@ const getImage = async (req, res, next) => {
 
 const updateEvent = async (req, res, next) => {
   try {
-    const { error } = updateEventSchema.validate(req.body);
-    if (error) return next({ statusCode: 400, message: error.details[0].message });
+    // 🔎 Validação com Joi (pode usar abortEarly: false pra mensagens mais ricas, se quiser)
+    const { error } = updateEventSchema.validate(req.body, { abortEarly: false });
+    if (error) {
+      return next({ statusCode: 400, message: error.details[0].message });
+    }
 
+    // 🔐 Busca o evento e garante que o usuário é o criador
     const event = await Event.findById(req.params.id);
-    if (!event) return next({ statusCode: 404, message: "Evento não encontrado" });
-    if (event.criador !== req.user.uid) return next({ statusCode: 403, message: "Você não é o criador deste evento" });
+    if (!event) {
+      return next({ statusCode: 404, message: "Evento não encontrado" });
+    }
 
+    if (event.criador !== req.user.uid) {
+      return next({ statusCode: 403, message: "Você não é o criador deste evento" });
+    }
+
+    // 📝 Atualiza os campos do evento
     Object.assign(event, req.body);
     await event.save();
 
-    const updatedEvent = await Event.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    // 🔁 Garante que pegamos a versão atualizada do banco
+    const updatedEvent = await Event.findById(req.params.id);
 
-    const htmlContent = generateEventUpdatedEmail(
-      req.user.name,
-      req.body.nome,
-      `http://event-manager-back.onrender.com/api/events/${updatedEvent._id}`
-    );
-
-    await sendEmail({
-      to: req.user.email,
-      subject: 'Evento Atualizado!',
-      text: `Seu evento \"${req.body.nome}\" foi atualizado!`,
-      html: htmlContent,
-    });
-
+    // ✅ RESPONDE primeiro para o cliente
     res.status(200).json(updatedEvent);
+
+    // 📧 Envia o e-mail EM BACKGROUND (não quebra a resposta se der erro)
+    setImmediate(async () => {
+      try {
+        const htmlContent = generateEventUpdatedEmail(
+          req.user.name,
+          updatedEvent.nome || updatedEvent.titulo,
+          `http://event-manager-back.onrender.com/api/events/${updatedEvent._id}`
+        );
+
+        await sendEmail({
+          to: req.user.email,
+          subject: `Evento Atualizado: "${updatedEvent.nome || updatedEvent.titulo}"`,
+          text: `Seu evento "${updatedEvent.nome || updatedEvent.titulo}" foi atualizado!`,
+          html: htmlContent,
+        });
+
+        console.log(`📧 E-mail de atualização enviado para ${req.user.email}`);
+      } catch (emailErr) {
+        console.error("⚠️ Falha ao enviar e-mail de atualização:", emailErr);
+      }
+    });
   } catch (err) {
     console.error("🔥 ERRO AO ATUALIZAR EVENTO:", err);
     next({ statusCode: 500, message: "Erro ao atualizar evento", stack: err.stack });
   }
 };
+
 
 const deleteEvent = async (req, res, next) => {
   try {
