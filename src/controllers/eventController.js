@@ -134,10 +134,11 @@ const createEventWithImages = async (req, res, next) => {
 
     if (error) {
       console.error("   Erro de validação:", error.details);
-      return res.status(400).json({
-        message: "Erro de validação",
-        errors: error.details.map((err) => err.message),
-      });
+      return next({
+       statusCode: 400,
+       message: "Erro de validação do evento",
+       details: error.details.map(d => d.message)
+     });
     }
     console.log("   Dados validados:", value);
 
@@ -168,9 +169,6 @@ const createEventWithImages = async (req, res, next) => {
     });
   }
 };
-
-
-
 
 // Buscar todos os eventos
 const getAllEvents = async (req, res, next) => {
@@ -232,7 +230,7 @@ const updateEvent = async (req, res, next) => {
     }
 
     if (event.criador !== req.user.uid) {
-      return next({ statusCode: 403, message: "Você não é o criador deste evento" });
+      return next({ statusCode: 403, message: "Você não tem permissão para editar este evento" });
     }
 
     // 📝 Atualiza os campos do evento
@@ -268,7 +266,7 @@ const updateEvent = async (req, res, next) => {
     });
   } catch (err) {
     console.error("🔥 ERRO AO ATUALIZAR EVENTO:", err);
-    next({ statusCode: 500, message: "Erro ao atualizar evento", stack: err.stack });
+    next({ statusCode: 500, message: "Erro ao atualizar evento", stack: err.message });
   }
 };
 
