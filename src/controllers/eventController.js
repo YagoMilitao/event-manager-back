@@ -15,7 +15,7 @@ const processImages = (files) => {
 
 // ✅ Helper pra jogar erro de validação Joi no middleware de erro
 function handleJoiError(error, next, contextoMensagem = "Erro de validação do evento") {
-  console.error("   Erro de validação Joi:", error.details);
+  console.error("Erro de validação Joi:", error.details);
   return next({
     statusCode: 400,
     message: contextoMensagem,
@@ -72,12 +72,24 @@ const createEvent = async (req, res, next) => {
     // 📧 E-mail em background (não afeta a resposta da API)
     setImmediate(async () => {
       try {
-        await sendEmail({
-          to: req.user.email,
-          subject: `Seu evento "${value.nome}" foi criado!`,
-          html: htmlContent,
-        });
-        console.log(`📧 E-mail enviado com sucesso para "${req.user.uid}" (${req.user.email})`);
+        console.log("req.user.email, req.organizadores.email" + req.user.email, req.organizadores.email);
+        if (req.user.email != req.organizadores.email) {
+          await sendEmail({
+            to: req.organizadores.email && req.user.email,
+            subject: `Seu evento "${value.nome}" foi criado!`,
+            html: htmlContent,
+          });
+          console.log(`📧 E-mail enviado com sucesso para "${req.user.uid}" (${req.user.email}+${req.organizadores.email })`);
+        }
+        else{
+          await sendEmail({
+            to: req.user.email,
+            subject: `Seu evento "${value.nome}" foi criado!`,
+            html: htmlContent,
+          });
+          console.log(`📧 E-mail enviado com sucesso para "${req.user.uid}" (${req.user.email})`);
+        }
+        
       } catch (error) {
         console.error('⚠️ Falha ao enviar e-mail em background:', error);
       }
@@ -318,14 +330,23 @@ const updateEvent = async (req, res, next) => {
           updatedEvent.nome || updatedEvent.titulo,
           `http://event-manager-back.onrender.com/api/events/${updatedEvent._id}`
         );
-
-        await sendEmail({
-          to: req.user.email,
-          subject: `Evento Atualizado: "${updatedEvent.nome || updatedEvent.titulo}"`,
-          text: `Seu evento "${updatedEvent.nome || updatedEvent.titulo}" foi atualizado!`,
-          html: htmlContent,
-        });
-
+        if(req.user.email != req.organizadores.email){
+          await sendEmail({
+            to: req.user.email && req.organizadores.email,
+            subject: `Evento Atualizado: "${updatedEvent.nome || updatedEvent.titulo}"`,
+            text: `Seu evento "${updatedEvent.nome || updatedEvent.titulo}" para o dia "${updatedEvent.data}" foi atualizado!`,
+            html: htmlContent,
+          });
+        }
+        else{
+          await sendEmail({
+            to: req.user.email,
+            subject: `Evento Atualizado: "${updatedEvent.nome || updatedEvent.titulo}"`,
+            text: `Seu evento "${updatedEvent.nome || updatedEvent.titulo}" para o dia "${updatedEvent.data}" foi atualizado!`,
+            html: htmlContent,
+          });
+        }
+        
         console.log(`📧 E-mail de atualização enviado para ${req.user.email}`);
       } catch (emailErr) {
         console.error("⚠️ Falha ao enviar e-mail de atualização:", emailErr);
@@ -364,13 +385,24 @@ const deleteEvent = async (req, res, next) => {
 
     setImmediate(async () => {
       try {
-        await sendEmail({
-          to: req.user.email,
+        if(req.user.email != req.organizadores.email){
+          await sendEmail({
+          to: req.user.email && req.organizadores.email,
           subject: 'Evento deletado!',
           text: `Seu evento "${event.nome}" foi deletado!`,
           html: htmlContent,
         });
         console.log(`📧 E-mail de deleção enviado para ${req.user.email}`);
+        }
+        else{
+          await sendEmail({
+          to: req.user.email,
+          subject: 'Evento deletado!',
+          text: `Seu evento "${event.nome}" foi deletado!`,
+          html: htmlContent,
+        });
+        }
+        
       } catch (emailErr) {
         console.error("⚠️ Falha ao enviar e-mail de deleção:", emailErr);
       }

@@ -1,5 +1,5 @@
 const express = require("express");
-const eventRoutes = require("./events");  // Importando as rotas de eventos
+const eventRoutes = require("./events");
 
 const router = express.Router();
 

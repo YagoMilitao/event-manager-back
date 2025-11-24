@@ -1,5 +1,4 @@
-const admin = require('../auth/firebase'); // Aqui pegamos o firebase.js que você já criou
-
+const admin = require('../auth/firebase');
 // Função para registrar usuário
 const registerUser = async (req, res) => {
   const { email, password } = req.body;
