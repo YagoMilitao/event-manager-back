@@ -215,14 +215,41 @@ const createEventWithImages = async (req, res, next) => {
 // Buscar todos os eventos
 const getAllEvents = async (req, res, next) => {
   try {
-    const events = await Event.find();
-    res.status(200).json(events);
+    // pega page e limit da query string. Ex: /api/events?page=2&limit=20
+    const page = parseInt(String(req.query.page || '1'), 10);        // página atual (1-based)
+    const limit = parseInt(String(req.query.limit || '10'), 10);     // itens por página
+
+    // garante que nunca seja menor que 1
+    const safePage = Number.isNaN(page) || page < 1 ? 1 : page;
+    const safeLimit = Number.isNaN(limit) || limit < 1 ? 10 : limit;
+
+    // calcula quantos itens pular (skip) com base na página
+    const skip = (safePage - 1) * safeLimit;
+
+    // busca total de eventos (para saber quantas páginas existem)
+    const total = await Event.countDocuments({});
+
+    // busca os eventos da página atual, ordenados por data (mais próximos primeiro)
+    const events = await Event.find({})
+      .sort({ data: 1 }) // 1 = ascendente
+      .skip(skip)        // pula (page-1) * limit registros
+      .limit(safeLimit); // pega até "limit" registros
+
+    // calcula se ainda tem mais páginas
+    const hasMore = safePage * safeLimit < total;
+
+    // responde com dados + metadados de paginação
+    return res.json({
+      events,     // lista de eventos dessa página
+      page: safePage,
+      limit: safeLimit,
+      total,      // total geral de eventos
+      hasMore,    // se ainda existem mais páginas depois dessa
+    });
   } catch (err) {
-    console.error("🔥 ERRO AO LISTAR EVENTOS:", err);
-    next({
-      statusCode: 500,
-      message: "Erro ao buscar eventos",
-      details: [err.message],
+    console.error('🔥 Erro ao listar eventos paginados:', err);
+    return res.status(500).json({
+      message: 'Erro ao listar eventos',
     });
   }
 };
