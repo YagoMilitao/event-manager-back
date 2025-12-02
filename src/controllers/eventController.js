@@ -25,6 +25,12 @@ function handleJoiError(
   });
 }
 
+function getField(body, key) {
+  if (body[key] !== undefined) return body[key];
+  if (body[`${key} `] !== undefined) return body[`${key} `];
+  return undefined;
+}
+
 // ---------------------------------------------------------------------
 // Criar novo evento (sem imagens) - JSON puro
 // ---------------------------------------------------------------------
@@ -132,21 +138,24 @@ const createEventWithImages = async (req, res, next) => {
       });
     }
 
-    // 2) Campos normais do body
-    const nome = req.body.nome?.toString();
+    // 2) Campos normais do body (usando helper pra tratar possíveis espaços)
+    const nome = getField(req.body, "nome")?.toString();
     const descricao =
-      req.body.descricao?.toString() || "Sem descrição informada.";
-    const data = req.body.data?.toString();
-    const horaInicio = req.body.horaInicio
-      ? Number(req.body.horaInicio)
-      : undefined;
-    const horaFim = req.body.horaFim ? Number(req.body.horaFim) : undefined;
-    const local = req.body.local?.toString();
-    const traje = req.body.traje?.toString() || "Livre";
-    const preco = req.body.preco?.toString() || "0";
+      getField(req.body, "descricao")?.toString() || "Sem descrição informada.";
+    const data = getField(req.body, "data")?.toString();
+
+    const horaInicioStr = getField(req.body, "horaInicio");
+    const horaFimStr = getField(req.body, "horaFim");
+
+    const horaInicio = horaInicioStr ? Number(horaInicioStr) : undefined;
+    const horaFim = horaFimStr ? Number(horaFimStr) : undefined;
+
+    const local = getField(req.body, "local")?.toString();
+    const traje = getField(req.body, "traje")?.toString() || "Livre";
+    const preco = getField(req.body, "preco")?.toString() || "0";
 
     // 3) Parse do array de organizadores (veio como string JSON)
-    const rawOrganizadores = req.body.organizadores;
+    const rawOrganizadores = getField(req.body, "organizadores");
     let parsedOrganizadores = [];
     if (rawOrganizadores) {
       try {
@@ -172,10 +181,8 @@ const createEventWithImages = async (req, res, next) => {
       organizadores: parsedOrganizadores,
       imagemCapa: uploadedImages[0] || undefined,
       imagens: uploadedImages,
-      images: uploadedImages, // compat com campo antigo
     };
 
-    // 4) Validar com Joi
     const { error, value } = createEventSchema.validate(eventData, {
       abortEarly: false,
     });
@@ -189,7 +196,6 @@ const createEventWithImages = async (req, res, next) => {
       });
     }
 
-    // 5) Criar o evento no Mongo
     const newEvent = new Event({
       ...value,
       criador: req.user.uid,

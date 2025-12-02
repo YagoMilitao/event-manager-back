@@ -14,7 +14,7 @@ router.get('/test-token', async (req, res) => {
     return res.status(401).json({ message: 'Token não enviado.' });
   }
 
-  const token = authHeader.split(' ')[1]; // pega só o token, tirando o "Bearer "
+  const token = authHeader.split(' ')[1];
 
   try {
     const decodedToken = await decodeToken(token);
