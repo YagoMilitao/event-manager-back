@@ -1,20 +1,22 @@
 const Event = require("../models/Event");
-const { createEventSchema, updateEventSchema } = require("../validations/eventValidation");
-const { sendEmail } = require('../services/emailService');
-const generateEventCreatedEmail = require('../services/emailTemplates/generateEventCreatedEmail');
-const generateEventUpdatedEmail = require('../services/emailTemplates/generateEventUpdatedEmail');
-const generateEventDeletedEmail = require('../services/emailTemplates/generateEventDeletedEmail');
+const {
+  createEventSchema,
+  updateEventSchema,
+} = require("../validations/eventValidation");
+const { sendEmail } = require("../services/emailService");
+const generateEventCreatedEmail = require("../services/emailTemplates/generateEventCreatedEmail");
+const generateEventUpdatedEmail = require("../services/emailTemplates/generateEventUpdatedEmail");
+const generateEventDeletedEmail = require("../services/emailTemplates/generateEventDeletedEmail");
 
-// 🛠️ Função auxiliar para converter imagens do multer em base64
-const processImages = (files) => {
-  return files.map((file) => ({
-    data: file.buffer.toString("base64"),
-    contentType: file.mimetype,
-  }));
-};
+// ☁️ Upload / delete no GCP
+const { uploadImageToGCS, deleteImageFromGCS } = require("../gcpStorage");
 
 // ✅ Helper pra jogar erro de validação Joi no middleware de erro
-function handleJoiError(error, next, contextoMensagem = "Erro de validação do evento") {
+function handleJoiError(
+  error,
+  next,
+  contextoMensagem = "Erro de validação do evento"
+) {
   console.error("Erro de validação Joi:", error.details);
   return next({
     statusCode: 400,
@@ -23,23 +25,19 @@ function handleJoiError(error, next, contextoMensagem = "Erro de validação do 
   });
 }
 
-// Criar novo evento (sem imagens)
+// ---------------------------------------------------------------------
+// Criar novo evento (sem imagens) - JSON puro
+// ---------------------------------------------------------------------
 const createEvent = async (req, res, next) => {
   try {
     console.log("➡️ createEvent chamado");
     console.log("   req.body:", req.body);
 
-    const { error, value } = createEventSchema.validate(req.body, { abortEarly: false });
+    const { error, value } = createEventSchema.validate(req.body, {
+      abortEarly: false,
+    });
     if (error) {
       console.error("   Erro de validação:", error.details);
-      return next({
-        statusCode: 400,
-        message: "Erro de validação ao criar evento",
-        details: error.details.map(d => d.message),
-      });
-    }
-
-    if (error) {
       return handleJoiError(error, next, "Erro de validação ao criar evento");
     }
 
@@ -53,6 +51,7 @@ const createEvent = async (req, res, next) => {
       userId: req.user.uid,
       criador: req.user.uid,
     });
+
     console.log("   Evento a ser salvo:", newEvent);
 
     const savedEvent = await newEvent.save();
@@ -65,33 +64,41 @@ const createEvent = async (req, res, next) => {
     );
 
     res.status(201).json({
-      message: "Evento criado com sucesso! Um e-mail de confirmação está sendo enviado.",
+      message:
+        "Evento criado com sucesso! Um e-mail de confirmação está sendo enviado.",
       evento: savedEvent,
     });
 
-    // 📧 E-mail em background (não afeta a resposta da API)
+    // 📧 E-mail em background (não trava a resposta)
     setImmediate(async () => {
       try {
-        console.log("req.user.email, req.organizadores.email" + req.user.email, req.organizadores.email);
-        if (req.user.email != req.organizadores.email) {
+        console.log(
+          "req.user.email, req.organizadores.email",
+          req.user.email,
+          req.organizadores?.email
+        );
+
+        if (req.user.email !== req.organizadores?.email) {
           await sendEmail({
-            to: req.organizadores.email && req.user.email,
+            to: req.organizadores?.email && req.user.email,
             subject: `Seu evento "${value.nome}" foi criado!`,
             html: htmlContent,
           });
-          console.log(`📧 E-mail enviado com sucesso para "${req.user.uid}" (${req.user.email}+${req.organizadores.email })`);
-        }
-        else{
+          console.log(
+            `📧 E-mail enviado com sucesso para "${req.user.uid}" (${req.user.email}+${req.organizadores?.email})`
+          );
+        } else {
           await sendEmail({
             to: req.user.email,
             subject: `Seu evento "${value.nome}" foi criado!`,
             html: htmlContent,
           });
-          console.log(`📧 E-mail enviado com sucesso para "${req.user.uid}" (${req.user.email})`);
+          console.log(
+            `📧 E-mail enviado com sucesso para "${req.user.uid}" (${req.user.email})`
+          );
         }
-        
       } catch (error) {
-        console.error('⚠️ Falha ao enviar e-mail em background:', error);
+        console.error("⚠️ Falha ao enviar e-mail em background:", error);
       }
     });
   } catch (err) {
@@ -104,43 +111,46 @@ const createEvent = async (req, res, next) => {
   }
 };
 
-// Criar evento com imagens (multipart/form-data)
+// ---------------------------------------------------------------------
+// Criar evento com imagens (multipart/form-data + GCP)
+// ---------------------------------------------------------------------
 const createEventWithImages = async (req, res, next) => {
   try {
     console.log("➡️ createEventWithImages chamado");
     console.log("   req.body:", req.body);
     console.log("   req.files:", req.files);
 
-    // Usa o helper processImages
     const filesArray = Array.isArray(req.files) ? req.files : [];
-    const convertImages = filesArray.length > 0 ? processImages(filesArray) : [];
 
-    // Parse dos campos (strings vindas do multipart/form-data)
+    // 1) Sobe todas as imagens para o GCS
+    const uploadedImages = [];
+    for (const file of filesArray) {
+      const uploaded = await uploadImageToGCS(file); // { publicUrl, filename }
+      uploadedImages.push({
+        url: uploaded.publicUrl,
+        filename: uploaded.filename,
+      });
+    }
+
+    // 2) Campos normais do body
     const nome = req.body.nome?.toString();
-    const descricao = req.body.descricao?.toString() || "Sem descrição informada.";
+    const descricao =
+      req.body.descricao?.toString() || "Sem descrição informada.";
     const data = req.body.data?.toString();
-    const horaInicio = req.body.horaInicio ? Number(req.body.horaInicio) : undefined;
+    const horaInicio = req.body.horaInicio
+      ? Number(req.body.horaInicio)
+      : undefined;
     const horaFim = req.body.horaFim ? Number(req.body.horaFim) : undefined;
     const local = req.body.local?.toString();
     const traje = req.body.traje?.toString() || "Livre";
     const preco = req.body.preco?.toString() || "0";
 
-    console.log("req.body.nome", nome);
-    console.log("req.body.descricao", descricao);
-    console.log("req.body.data", data);
-    console.log("req.body.horaInicio", horaInicio);
-    console.log("req.body.horaFim", horaFim);
-    console.log("req.body.local", local);
-    console.log("req.body.traje", traje);
-    console.log("req.body.preco", preco);
-
-    // Parse do array de organizadores
+    // 3) Parse do array de organizadores (veio como string JSON)
     const rawOrganizadores = req.body.organizadores;
     let parsedOrganizadores = [];
     if (rawOrganizadores) {
       try {
         parsedOrganizadores = JSON.parse(rawOrganizadores);
-        console.log("   parsedOrganizadores:", parsedOrganizadores);
       } catch (err) {
         console.error("   Erro ao parsear organizadores:", err);
         return next({
@@ -160,11 +170,12 @@ const createEventWithImages = async (req, res, next) => {
       traje,
       preco,
       organizadores: parsedOrganizadores,
-      images: convertImages,
+      imagemCapa: uploadedImages[0] || undefined,
+      imagens: uploadedImages,
+      images: uploadedImages, // compat com campo antigo
     };
-    console.log("   eventData antes da validação:", eventData);
 
-    // Validação com Joi
+    // 4) Validar com Joi
     const { error, value } = createEventSchema.validate(eventData, {
       abortEarly: false,
     });
@@ -172,34 +183,24 @@ const createEventWithImages = async (req, res, next) => {
     if (error) {
       console.error("   Erro de validação:", error.details);
       return next({
-       statusCode: 400,
-       message: "Erro de validação do evento",
-       details: error.details.map(d => d.message)
-     });
+        statusCode: 400,
+        message: "Erro de validação do evento",
+        details: error.details.map((d) => d.message),
+      });
     }
-    
 
-    if (error) {
-      return handleJoiError(error, next, "Erro de validação ao criar evento com imagens");
-    }
-    console.log("   Dados validados:", value);
-
+    // 5) Criar o evento no Mongo
     const newEvent = new Event({
       ...value,
-      // capa (pra bater com getImage, que usa event.imagem)
-      imagem: convertImages[0] || undefined,
-      // array completo de imagens
-      images: convertImages,
       criador: req.user.uid,
       userId: req.user.uid,
     });
-    console.log("   Evento a ser salvo:", newEvent);
 
     const savedEvent = await newEvent.save();
-    console.log("   Evento salvo com sucesso:", savedEvent);
+    console.log("   Evento salvo com sucesso:", savedEvent._id);
 
     res.status(201).json({
-      message: "Evento criado com sucesso com imagens.",
+      message: "Evento criado com sucesso com imagens no GCP.",
       evento: savedEvent._id,
     });
   } catch (err) {
@@ -212,48 +213,46 @@ const createEventWithImages = async (req, res, next) => {
   }
 };
 
-// Buscar todos os eventos
+// ---------------------------------------------------------------------
+// Listar eventos (paginado)
+// ---------------------------------------------------------------------
 const getAllEvents = async (req, res, next) => {
   try {
-    // pega page e limit da query string. Ex: /api/events?page=2&limit=20
-    const page = parseInt(String(req.query.page || '1'), 10);        // página atual (1-based)
-    const limit = parseInt(String(req.query.limit || '10'), 10);     // itens por página
+    const page = parseInt(String(req.query.page || "1"), 10);
+    const limit = parseInt(String(req.query.limit || "10"), 10);
 
-    // garante que nunca seja menor que 1
     const safePage = Number.isNaN(page) || page < 1 ? 1 : page;
     const safeLimit = Number.isNaN(limit) || limit < 1 ? 10 : limit;
 
-    // calcula quantos itens pular (skip) com base na página
     const skip = (safePage - 1) * safeLimit;
 
-    // busca total de eventos (para saber quantas páginas existem)
     const total = await Event.countDocuments({});
 
-    // busca os eventos da página atual, ordenados por data (mais próximos primeiro)
     const events = await Event.find({})
-      .sort({ data: 1 }) // 1 = ascendente
-      .skip(skip)        // pula (page-1) * limit registros
-      .limit(safeLimit); // pega até "limit" registros
+      .sort({ data: 1 })
+      .skip(skip)
+      .limit(safeLimit);
 
-    // calcula se ainda tem mais páginas
     const hasMore = safePage * safeLimit < total;
 
-    // responde com dados + metadados de paginação
     return res.json({
-      events,     // lista de eventos dessa página
+      events,
       page: safePage,
       limit: safeLimit,
-      total,      // total geral de eventos
-      hasMore,    // se ainda existem mais páginas depois dessa
+      total,
+      hasMore,
     });
   } catch (err) {
-    console.error('🔥 Erro ao listar eventos paginados:', err);
+    console.error("🔥 Erro ao listar eventos paginados:", err);
     return res.status(500).json({
-      message: 'Erro ao listar eventos',
+      message: "Erro ao listar eventos",
     });
   }
 };
 
+// ---------------------------------------------------------------------
+// Buscar evento por ID
+// ---------------------------------------------------------------------
 const getEventById = async (req, res, next) => {
   try {
     const event = await Event.findById(req.params.id);
@@ -274,6 +273,9 @@ const getEventById = async (req, res, next) => {
   }
 };
 
+// ---------------------------------------------------------------------
+// Eventos do usuário logado
+// ---------------------------------------------------------------------
 const getMyEvents = async (req, res, next) => {
   try {
     const userEvents = await Event.find({ criador: req.user.uid });
@@ -288,17 +290,21 @@ const getMyEvents = async (req, res, next) => {
   }
 };
 
+// ---------------------------------------------------------------------
+// getImage - agora só faz redirect pra URL da capa no GCP
+// ---------------------------------------------------------------------
 const getImage = async (req, res, next) => {
   try {
     const event = await Event.findById(req.params.id);
-    if (!event || !event.imagem || !event.imagem.data) {
+    if (!event || !event.imagemCapa || !event.imagemCapa.url) {
       return next({
         statusCode: 404,
         message: "Imagem do evento não encontrada",
       });
     }
-    res.contentType(event.imagem.contentType);
-    res.send(event.imagem.data);
+
+    // 👉 Redireciona o browser para a URL pública no GCP
+    return res.redirect(event.imagemCapa.url);
   } catch (err) {
     console.error("🔥 ERRO AO RETORNAR IMAGEM:", err);
     next({
@@ -309,20 +315,18 @@ const getImage = async (req, res, next) => {
   }
 };
 
+// ---------------------------------------------------------------------
+// Atualizar evento (ainda sem editar imagens – só dados)
+// ---------------------------------------------------------------------
 const updateEvent = async (req, res, next) => {
   try {
     console.log("✏️ updateEvent chamado. Body recebido:", req.body);
 
-    const { error } = updateEventSchema.validate(req.body, { abortEarly: false });
+    const { error } = updateEventSchema.validate(req.body, {
+      abortEarly: false,
+    });
     if (error) {
       console.error("   Erro de validação ao atualizar:", error.details);
-      return next({
-        statusCode: 400,
-        message: "Erro de validação ao atualizar evento",
-        details: error.details.map(d => d.message),
-      });
-    }
-    if (error) {
       return handleJoiError(error, next, "Erro de validação ao atualizar evento");
     }
 
@@ -343,7 +347,6 @@ const updateEvent = async (req, res, next) => {
 
     const updatedEvent = await Event.findById(req.params.id);
 
-    // ✅ responde primeiro
     res.status(200).json({
       message: "Evento atualizado com sucesso",
       evento: updatedEvent,
@@ -357,23 +360,30 @@ const updateEvent = async (req, res, next) => {
           updatedEvent.nome || updatedEvent.titulo,
           `http://event-manager-back.onrender.com/api/events/${updatedEvent._id}`
         );
-        if(req.user.email != req.organizadores.email){
+        if (req.user.email !== req.organizadores?.email) {
           await sendEmail({
-            to: req.user.email && req.organizadores.email,
-            subject: `Evento Atualizado: "${updatedEvent.nome || updatedEvent.titulo}"`,
-            text: `Seu evento "${updatedEvent.nome || updatedEvent.titulo}" para o dia "${updatedEvent.data}" foi atualizado!`,
+            to: req.user.email && req.organizadores?.email,
+            subject: `Evento Atualizado: "${
+              updatedEvent.nome || updatedEvent.titulo
+            }"`,
+            text: `Seu evento "${
+              updatedEvent.nome || updatedEvent.titulo
+            }" para o dia "${updatedEvent.data}" foi atualizado!`,
             html: htmlContent,
           });
-        }
-        else{
+        } else {
           await sendEmail({
             to: req.user.email,
-            subject: `Evento Atualizado: "${updatedEvent.nome || updatedEvent.titulo}"`,
-            text: `Seu evento "${updatedEvent.nome || updatedEvent.titulo}" para o dia "${updatedEvent.data}" foi atualizado!`,
+            subject: `Evento Atualizado: "${
+              updatedEvent.nome || updatedEvent.titulo
+            }"`,
+            text: `Seu evento "${
+              updatedEvent.nome || updatedEvent.titulo
+            }" para o dia "${updatedEvent.data}" foi atualizado!`,
             html: htmlContent,
           });
         }
-        
+
         console.log(`📧 E-mail de atualização enviado para ${req.user.email}`);
       } catch (emailErr) {
         console.error("⚠️ Falha ao enviar e-mail de atualização:", emailErr);
@@ -389,6 +399,9 @@ const updateEvent = async (req, res, next) => {
   }
 };
 
+// ---------------------------------------------------------------------
+// Deletar evento + imagens do GCP
+// ---------------------------------------------------------------------
 const deleteEvent = async (req, res, next) => {
   try {
     const event = await Event.findById(req.params.id);
@@ -402,6 +415,28 @@ const deleteEvent = async (req, res, next) => {
       });
     }
 
+    // 🗑️ Limpa imagens do GCS (se existir)
+    const filenames = [];
+
+    if (event.imagemCapa?.filename) {
+      filenames.push(event.imagemCapa.filename);
+    }
+
+    if (Array.isArray(event.imagens)) {
+      event.imagens.forEach((img) => {
+        if (img?.filename) filenames.push(img.filename);
+      });
+    }
+
+    // deleta em background (não precisa travar a resposta)
+    setImmediate(async () => {
+      try {
+        await Promise.all(filenames.map((f) => deleteImageFromGCS(f)));
+      } catch (err) {
+        console.error("⚠️ Erro ao deletar imagens do GCS:", err);
+      }
+    });
+
     await Event.findByIdAndDelete(req.params.id);
 
     const htmlContent = generateEventDeletedEmail(
@@ -412,24 +447,22 @@ const deleteEvent = async (req, res, next) => {
 
     setImmediate(async () => {
       try {
-        if(req.user.email != req.organizadores.email){
+        if (req.user.email !== req.organizadores?.email) {
           await sendEmail({
-          to: req.user.email && req.organizadores.email,
-          subject: 'Evento deletado!',
-          text: `Seu evento "${event.nome}" foi deletado!`,
-          html: htmlContent,
-        });
-        console.log(`📧 E-mail de deleção enviado para ${req.user.email}`);
-        }
-        else{
+            to: req.user.email && req.organizadores?.email,
+            subject: "Evento deletado!",
+            text: `Seu evento "${event.nome}" foi deletado!`,
+            html: htmlContent,
+          });
+          console.log(`📧 E-mail de deleção enviado para ${req.user.email}`);
+        } else {
           await sendEmail({
-          to: req.user.email,
-          subject: 'Evento deletado!',
-          text: `Seu evento "${event.nome}" foi deletado!`,
-          html: htmlContent,
-        });
+            to: req.user.email,
+            subject: "Evento deletado!",
+            text: `Seu evento "${event.nome}" foi deletado!`,
+            html: htmlContent,
+          });
         }
-        
       } catch (emailErr) {
         console.error("⚠️ Falha ao enviar e-mail de deleção:", emailErr);
       }
