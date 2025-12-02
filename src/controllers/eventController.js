@@ -9,7 +9,7 @@ const generateEventUpdatedEmail = require("../services/emailTemplates/generateEv
 const generateEventDeletedEmail = require("../services/emailTemplates/generateEventDeletedEmail");
 
 // ☁️ Upload / delete no GCP
-const { uploadImageToGCS, deleteImageFromGCS } = require("../gcpStorage");
+const { uploadImageToGCS, deleteImageFromGCS } = require("../middlewares/gcpStorage");
 
 // ✅ Helper pra jogar erro de validação Joi no middleware de erro
 function handleJoiError(
