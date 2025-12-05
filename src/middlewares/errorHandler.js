@@ -6,10 +6,8 @@ module.exports = (err, req, res, next) => {
   let message = "Erro interno do servidor";
   let details = null;
 
-  // Mensagem principal
   if (err.message) message = err.message;
 
-  // Joi validation array
   if (Array.isArray(err.details)) {
     details = err.details.map((d) => d.message);
   }
@@ -21,7 +19,6 @@ module.exports = (err, req, res, next) => {
     return res.status(400).json({ error: message, details });
   }
 
-  // Erro padrão
   return res.status(statusCode).json({
     error: message,
     details,

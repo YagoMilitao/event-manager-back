@@ -2,7 +2,7 @@ const Joi = require("joi");
 
 // 🔹 Schema de organizador
 const organizerSchema = Joi.object({
-  nome: Joi.string().min(1).required().messages({
+  organizerName: Joi.string().min(1).required().messages({
     "any.required": "O nome do organizador é obrigatório.",
     "string.empty": "O nome do organizador é obrigatório.",
   }),
@@ -10,6 +10,8 @@ const organizerSchema = Joi.object({
     "string.email": "E-mail do organizador inválido.",
   }),
   whatsapp: Joi.string().allow("", null),
+  facebook: Joi.string().allow("", null),
+  twitter: Joi.string().allow("", null),
   instagram: Joi.string().allow("", null),
 });
 
@@ -28,37 +30,37 @@ const imageSchema = Joi.object({
 
 // 🔹 CREATE
 const createEventSchema = Joi.object({
-  // ⚠️ IMPORTANTE: aqui a chave é "nome" (é isso que o controller usa)
-  nome: Joi.string().min(3).max(120).required().messages({
+  // ⚠️ IMPORTANTE: aqui a chave é "eventName" (é isso que o controller usa)
+  eventName: Joi.string().min(3).max(120).required().messages({
     "any.required": "O título é obrigatório.",
     "string.empty": "O título é obrigatório.",
     "string.min": "O título deve ter pelo menos {#limit} caracteres.",
     "string.max": "O título deve ter no máximo {#limit} caracteres.",
   }),
 
-  descricao: Joi.string().allow("", null),
+  description: Joi.string().allow("", null),
 
-  // Pra evitar treta com timezone/ISO, vamos aceitar string mesmo
-  data: Joi.string().required().messages({
+  // Pra evitar problemas com timezone/ISO, vamos aceitar string mesmo
+  date: Joi.string().required().messages({
     "any.required": "A data é obrigatória.",
     "string.empty": "A data é obrigatória.",
   }),
 
-  horaInicio: Joi.number().integer().min(0).max(2359).required().messages({
+  startTime: Joi.number().integer().min(0).max(2359).required().messages({
     "any.required": "Hora de início é obrigatória.",
     "number.base": "Hora de início deve ser um número (HHMM).",
     "number.min": "Hora de início é inválida.",
     "number.max": "Hora de início é inválida.",
   }),
 
-  horaFim: Joi.number().integer().min(0).max(2359).optional().allow(null),
+  endTime: Joi.number().integer().min(0).max(2359).optional().allow(null),
 
-  local: Joi.string().min(3).required().messages({
+  location: Joi.string().min(3).required().messages({
     "any.required": "O local é obrigatório.",
     "string.empty": "O local é obrigatório.",
   }),
 
-  preco: Joi.string()
+  price: Joi.string()
     .pattern(/^\d+(\.\d{1,2})?$/)
     .allow("", null)
     .messages({
@@ -66,9 +68,9 @@ const createEventSchema = Joi.object({
         "Preço inválido. Use apenas números, com até 2 casas decimais.",
     }),
 
-  traje: Joi.string().allow("", null),
+  dressCode: Joi.string().allow("", null),
 
-  organizadores: Joi.array()
+  organizers: Joi.array()
     .items(organizerSchema)
     .min(1)
     .required()
@@ -78,34 +80,34 @@ const createEventSchema = Joi.object({
     }),
 
   // 🔹 Campos de imagem vindos do GCP
-  imagemCapa: imageSchema.optional(),
-  imagens: Joi.array().items(imageSchema).optional(),
+  coverImage: imageSchema.optional(),
+  images: Joi.array().items(imageSchema).optional(),
 })
   // remove qualquer campo extra que a gente não definiu
   .prefs({ stripUnknown: true });
 
 // 🔹 UPDATE (bem flexível)
 const updateEventSchema = Joi.object({
-  nome: Joi.string().min(3).max(120).messages({
+  eventName: Joi.string().min(3).max(120).messages({
     "string.min": "O título deve ter pelo menos {#limit} caracteres.",
     "string.max": "O título deve ter no máximo {#limit} caracteres.",
   }),
-  descricao: Joi.string().allow("", null),
-  data: Joi.string().allow("", null),
-  horaInicio: Joi.number().integer().min(0).max(2359),
-  horaFim: Joi.number().integer().min(0).max(2359).allow(null),
-  local: Joi.string().min(3),
-  preco: Joi.string()
+  description: Joi.string().allow("", null),
+  date: Joi.string().allow("", null),
+  startTime: Joi.number().integer().min(0).max(2359),
+  endTime: Joi.number().integer().min(0).max(2359).allow(null),
+  location: Joi.string().min(3),
+  price: Joi.string()
     .pattern(/^\d+(\.\d{1,2})?$/)
     .allow("", null)
     .messages({
       "string.pattern.base":
         "Preço inválido. Use apenas números, com até 2 casas decimais.",
     }),
-  traje: Joi.string().allow("", null),
-  organizadores: Joi.array().items(organizerSchema),
-  imagemCapa: imageSchema.optional(),
-  imagens: Joi.array().items(imageSchema).optional(),
+  dressCode: Joi.string().allow("", null),
+  organizers: Joi.array().items(organizerSchema),
+  coverImage: imageSchema.optional(),
+  images: Joi.array().items(imageSchema).optional(),
 }).prefs({ stripUnknown: true });
 
 module.exports = {

@@ -11,7 +11,6 @@ const testAuthRoute = require("./src/routes/testTokenRoute.js");
 const errorHandler = require("./src/middlewares/errorHandler");
 const healthRoute = require("./src/routes/dbHealth");
 const authRoutes = require('./src/routes/auth');
-const { registerUser, loginUser } = require('./src/controllers/userController');
 
 dotenv.config();
 const app = express();

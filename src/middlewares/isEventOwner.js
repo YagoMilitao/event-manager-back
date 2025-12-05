@@ -13,7 +13,7 @@ const isEventOwner = async (req, res, next) => {
       });
     }
 
-    if (event.criador !== userId) {
+    if (event.creator !== userId) {
       return res.status(403).json({
          message: "Você não tem permissão para alterar este evento." 
       });

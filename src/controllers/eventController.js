@@ -15,12 +15,12 @@ const { uploadImageToGCS, deleteImageFromGCS } = require("../middlewares/gcpStor
 function handleJoiError(
   error,
   next,
-  contextoMensagem = "Erro de validação do evento"
+  contextMessage = "Erro de validação do evento"
 ) {
   console.error("Erro de validação Joi:", error.details);
   return next({
     statusCode: 400,
-    message: contextoMensagem,
+    message: contextMessage,
     details: error.details.map((d) => d.message),
   });
 }
@@ -51,11 +51,11 @@ const createEvent = async (req, res, next) => {
 
     const newEvent = new Event({
       ...value,
-      preco: value.preco || "0",
-      traje: value.traje || "Livre",
-      descricao: value.descricao || "Sem descrição informada.",
+      price: value.price || "0",
+      dressCode: value.dressCode || "Livre",
+      description: value.description || "Sem descrição informada.",
       userId: req.user.uid,
-      criador: req.user.uid,
+      creator: req.user.uid,
     });
 
     console.log("   Evento a ser salvo:", newEvent);
@@ -65,7 +65,7 @@ const createEvent = async (req, res, next) => {
 
     const htmlContent = generateEventCreatedEmail(
       req.user.uid,
-      value.nome,
+      value.eventName,
       `https://event-manager-back.onrender.com/create-event/${savedEvent._id}`
     );
 
@@ -79,24 +79,24 @@ const createEvent = async (req, res, next) => {
     setImmediate(async () => {
       try {
         console.log(
-          "req.user.email, req.organizadores.email",
+          "req.user.email, req.organizers.email",
           req.user.email,
-          req.organizadores?.email
+          req.organizers?.email
         );
 
-        if (req.user.email !== req.organizadores?.email) {
+        if (req.user.email !== req.organizers?.email) {
           await sendEmail({
-            to: req.organizadores?.email && req.user.email,
-            subject: `Seu evento "${value.nome}" foi criado!`,
+            to: req.organizers?.email && req.user.email,
+            subject: `Seu evento "${value.eventName}" foi criado!`,
             html: htmlContent,
           });
           console.log(
-            `📧 E-mail enviado com sucesso para "${req.user.uid}" (${req.user.email}+${req.organizadores?.email})`
+            `📧 E-mail enviado com sucesso para "${req.user.uid}" (${req.user.email}+${req.organizers?.email})`
           );
         } else {
           await sendEmail({
             to: req.user.email,
-            subject: `Seu evento "${value.nome}" foi criado!`,
+            subject: `Seu evento "${value.eventName}" foi criado!`,
             html: htmlContent,
           });
           console.log(
@@ -104,7 +104,7 @@ const createEvent = async (req, res, next) => {
           );
         }
       } catch (error) {
-        console.error("⚠️ Falha ao enviar e-mail em background:", error);
+        console.error(`⚠️ Falha ao enviar e-mail para "${req.user.uid}" no e-mail "${req.organizers?.email}" em background:`, error);
       }
     });
   } catch (err) {
@@ -139,48 +139,47 @@ const createEventWithImages = async (req, res, next) => {
     }
 
     // 2) Campos normais do body (usando helper pra tratar possíveis espaços)
-    const nome = getField(req.body, "nome")?.toString();
-    const descricao =
-      getField(req.body, "descricao")?.toString() || "Sem descrição informada.";
-    const data = getField(req.body, "data")?.toString();
+    const eventName = getField(req.body, "eventName")?.toString();
+    const description =
+      getField(req.body, "description")?.toString() || "Sem descrição informada.";
+    const date = getField(req.body, "date")?.toString();
 
-    const horaInicioStr = getField(req.body, "horaInicio");
-    const horaFimStr = getField(req.body, "horaFim");
+    const startTimeStr = getField(req.body, "startTime");
+    const endTimeStr = getField(req.body, "endTime");
 
-    const horaInicio = horaInicioStr ? Number(horaInicioStr) : undefined;
-    const horaFim = horaFimStr ? Number(horaFimStr) : undefined;
+    const startTime = startTimeStr ? Number(startTimeStr) : undefined;
+    const endTime = endTimeStr ? Number(endTimeStr) : undefined;
+    const location = getField(req.body, "location")?.toString();
+    const dressCode = getField(req.body, "dressCode")?.toString() || "Livre";
+    const price = getField(req.body, "price")?.toString() || "0";
 
-    const local = getField(req.body, "local")?.toString();
-    const traje = getField(req.body, "traje")?.toString() || "Livre";
-    const preco = getField(req.body, "preco")?.toString() || "0";
-
-    // 3) Parse do array de organizadores (veio como string JSON)
-    const rawOrganizadores = getField(req.body, "organizadores");
-    let parsedOrganizadores = [];
-    if (rawOrganizadores) {
+    // 3) Parse do array de organizers (veio como string JSON)
+    const raworganizers = getField(req.body, "organizers");
+    let parsedorganizers = [];
+    if (raworganizers) {
       try {
-        parsedOrganizadores = JSON.parse(rawOrganizadores);
+        parsedorganizers = JSON.parse(raworganizers);
       } catch (err) {
-        console.error("   Erro ao parsear organizadores:", err);
+        console.error("   Erro ao parsear organizers:", err);
         return next({
           statusCode: 400,
-          message: "Formato inválido para organizadores. Envie um JSON válido.",
+          message: "Formato inválido para organizers. Envie um JSON válido.",
         });
       }
     }
 
     const eventData = {
-      nome,
-      descricao,
-      data,
-      horaInicio,
-      horaFim,
-      local,
-      traje,
-      preco,
-      organizadores: parsedOrganizadores,
-      imagemCapa: uploadedImages[0] || undefined,
-      imagens: uploadedImages,
+      eventName,
+      description,
+      date,
+      startTime,
+      endTime,
+      location,
+      dressCode,
+      price,
+      organizers: parsedorganizers,
+      coverImage: uploadedImages[0] || undefined,
+      images: uploadedImages,
     };
 
     const { error, value } = createEventSchema.validate(eventData, {
@@ -198,7 +197,7 @@ const createEventWithImages = async (req, res, next) => {
 
     const newEvent = new Event({
       ...value,
-      criador: req.user.uid,
+      creator: req.user.uid,
       userId: req.user.uid,
     });
 
@@ -284,7 +283,7 @@ const getEventById = async (req, res, next) => {
 // ---------------------------------------------------------------------
 const getMyEvents = async (req, res, next) => {
   try {
-    const userEvents = await Event.find({ criador: req.user.uid });
+    const userEvents = await Event.find({ creator: req.user.uid });
     res.status(200).json(userEvents);
   } catch (err) {
     console.error("🔥 ERRO AO BUSCAR EVENTOS DO USUÁRIO:", err);
@@ -302,7 +301,7 @@ const getMyEvents = async (req, res, next) => {
 const getImage = async (req, res, next) => {
   try {
     const event = await Event.findById(req.params.id);
-    if (!event || !event.imagemCapa || !event.imagemCapa.url) {
+    if (!event || !event.coverImage || !event.coverImage.url) {
       return next({
         statusCode: 404,
         message: "Imagem do evento não encontrada",
@@ -310,7 +309,7 @@ const getImage = async (req, res, next) => {
     }
 
     // 👉 Redireciona o browser para a URL pública no GCP
-    return res.redirect(event.imagemCapa.url);
+    return res.redirect(event.coverImage.url);
   } catch (err) {
     console.error("🔥 ERRO AO RETORNAR IMAGEM:", err);
     next({
@@ -341,7 +340,7 @@ const updateEvent = async (req, res, next) => {
       return next({ statusCode: 404, message: "Evento não encontrado" });
     }
 
-    if (event.criador !== req.user.uid) {
+    if (event.creator !== req.user.uid) {
       return next({
         statusCode: 403,
         message: "Você não tem permissão para editar este evento",
@@ -363,36 +362,36 @@ const updateEvent = async (req, res, next) => {
       try {
         const htmlContent = generateEventUpdatedEmail(
           req.user.name,
-          updatedEvent.nome || updatedEvent.titulo,
+          updatedEvent.endTime,
           `http://event-manager-back.onrender.com/api/events/${updatedEvent._id}`
         );
-        if (req.user.email !== req.organizadores?.email) {
+        if (req.user.email !== req.organizers?.email) {
           await sendEmail({
-            to: req.user.email && req.organizadores?.email,
+            to: req.user.email && req.organizers?.email,
             subject: `Evento Atualizado: "${
-              updatedEvent.nome || updatedEvent.titulo
+              updatedEvent.eventName
             }"`,
             text: `Seu evento "${
-              updatedEvent.nome || updatedEvent.titulo
-            }" para o dia "${updatedEvent.data}" foi atualizado!`,
+              updatedEvent.eventName
+            }" para o dia "${updatedEvent.date}" foi atualizado!`,
             html: htmlContent,
           });
         } else {
           await sendEmail({
             to: req.user.email,
             subject: `Evento Atualizado: "${
-              updatedEvent.nome || updatedEvent.titulo
+              updatedEvent.eventName
             }"`,
             text: `Seu evento "${
-              updatedEvent.nome || updatedEvent.titulo
-            }" para o dia "${updatedEvent.data}" foi atualizado!`,
+              updatedEvent.eventName
+            }" para o dia "${updatedEvent.date}" foi atualizado!`,
             html: htmlContent,
           });
         }
 
-        console.log(`📧 E-mail de atualização enviado para ${req.user.email}`);
+        console.log(`📧 E-mail de atualização enviado para ${req.user.email} ou ${req.organizers?.email}`);
       } catch (emailErr) {
-        console.error("⚠️ Falha ao enviar e-mail de atualização:", emailErr);
+        console.error(`⚠️ Falha ao enviar e-mail para ${req.user.email}, ou ${req.organizers?.email} de atualização:`, emailErr);
       }
     });
   } catch (err) {
@@ -414,22 +413,22 @@ const deleteEvent = async (req, res, next) => {
     if (!event) {
       return next({ statusCode: 404, message: "Evento não encontrado" });
     }
-    if (event.criador !== req.user.uid) {
+    if (event.creator !== req.user.uid) {
       return next({
         statusCode: 403,
-        message: "Você não é o criador deste evento",
+        message: "Você não é o creator deste evento",
       });
     }
 
     // 🗑️ Limpa imagens do GCS (se existir)
     const filenames = [];
 
-    if (event.imagemCapa?.filename) {
-      filenames.push(event.imagemCapa.filename);
+    if (event.coverImage?.filename) {
+      filenames.push(event.coverImage.filename);
     }
 
-    if (Array.isArray(event.imagens)) {
-      event.imagens.forEach((img) => {
+    if (Array.isArray(event.images)) {
+      event.images.forEach((img) => {
         if (img?.filename) filenames.push(img.filename);
       });
     }
@@ -447,17 +446,17 @@ const deleteEvent = async (req, res, next) => {
 
     const htmlContent = generateEventDeletedEmail(
       req.user.name,
-      event.nome,
+      event.eventName,
       `http://event-manager-back.onrender.com/api/events/${event._id}`
     );
 
     setImmediate(async () => {
       try {
-        if (req.user.email !== req.organizadores?.email) {
+        if (req.user.email !== req.organizers?.email) {
           await sendEmail({
-            to: req.user.email && req.organizadores?.email,
+            to: req.user.email && req.organizers?.email,
             subject: "Evento deletado!",
-            text: `Seu evento "${event.nome}" foi deletado!`,
+            text: `Seu evento "${event.eventName}" foi deletado!`,
             html: htmlContent,
           });
           console.log(`📧 E-mail de deleção enviado para ${req.user.email}`);
@@ -465,12 +464,12 @@ const deleteEvent = async (req, res, next) => {
           await sendEmail({
             to: req.user.email,
             subject: "Evento deletado!",
-            text: `Seu evento "${event.nome}" foi deletado!`,
+            text: `Seu evento "${event.eventName}" foi deletado!`,
             html: htmlContent,
           });
         }
       } catch (emailErr) {
-        console.error("⚠️ Falha ao enviar e-mail de deleção:", emailErr);
+        console.error(`⚠️ Falha ao enviar e-mail para ${req.user.email}, ou ${req.organizers?.email} de deleção:`, emailErr);
       }
     });
 

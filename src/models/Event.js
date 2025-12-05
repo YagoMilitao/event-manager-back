@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 
 const OrganizerSchema = new mongoose.Schema({
-  nome: {
+  organizerName: {
     type: String,
     required: true,
     minlength: 2,
@@ -33,51 +33,45 @@ const ImageSchema = new mongoose.Schema({
 // 📅 Schema principal de Evento
 const EventSchema = new mongoose.Schema(
   {
-    nome: {
+    eventName: {
       type: String,
       required: true,
       minlength: 3,
       maxlength: 100,
     },
-    descricao: {
+    description: {
       type: String,
       default: "Sem descrição informada.",
     },
-    data: {
+    date: {
       type: Date,
       required: true,
     },
-    horaInicio: {
-      type: Number, // ex: 930, 1454
+    startTime: {
+      type: Number,
       required: true,
     },
-    horaFim: {
-      type: Number, // opcional
+    endTime: {
+      type: Number,
     },
-    traje: {
+    dressCode: {
       type: String,
       default: "Livre",
     },
-    local: {
+    location: {
       type: String,
       required: true,
       minlength: 3,
     },
-    preco: {
+    price: {
       type: String,
       default: "0",
     },
 
     // 🖼️ Imagem principal (capa)
-    imagemCapa: ImageSchema,
+    coverImage: ImageSchema,
 
     // 🖼️ Todas as imagens do evento
-    imagens: {
-      type: [ImageSchema],
-      default: [],
-    },
-
-    // 🔁 (Opcional) campo duplicado pra compatibilizar com frontend antigo
     images: {
       type: [ImageSchema],
       default: [],
@@ -85,16 +79,16 @@ const EventSchema = new mongoose.Schema(
 
     // 🔐 Relacionamento com usuário (Firebase UID)
     userId: { type: String, required: true },
-    criador: { type: String, required: true },
+    creator: { type: String, required: true },
 
     // 👥 Organizadores
-    organizadores: {
+    organizers: {
       type: [OrganizerSchema],
       default: [],
     },
   },
   {
-    timestamps: true, // createdAt / updatedAt
+    timestamps: true, 
   }
 );
 
