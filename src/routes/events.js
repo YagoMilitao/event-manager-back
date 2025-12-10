@@ -11,6 +11,7 @@ const {
   getImage,
   updateEvent,
   deleteEvent,
+  updateEventWithImages,
 } = require("../controllers/eventController");
 const isEventOwner = require("../middlewares/isEventOwner");
 const sanitizeMiddleware = require("../middlewares/sanitize"); // Importa o middleware de sanitização
@@ -38,6 +39,15 @@ router.get('/:id', getEventById);
 router.get("/image/:id", getImage);
 // 📌 Atualizar evento
 router.put("/:id", verifyToken, isEventOwner, updateEvent); // ✅ Aplica sanitização aqui também (boa prática)
+// 📌 Atualizar evento com imagens
+router.put(
+  "/:id/with-images",
+  verifyToken,
+  isEventOwner,
+  upload,            // multer (mesmo do create-with-images)
+  sanitizeMiddleware,
+  updateEventWithImages  // 👈 vamos criar essa função
+);
 // 📌 Deletar evento
 router.delete("/:id", verifyToken, isEventOwner, deleteEvent);
 

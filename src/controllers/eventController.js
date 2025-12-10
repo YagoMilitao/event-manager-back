@@ -405,6 +405,194 @@ const updateEvent = async (req, res, next) => {
 };
 
 // ---------------------------------------------------------------------
+// Atualizar evento COM imagens (multipart/form-data + GCP)
+// ---------------------------------------------------------------------
+const updateEventWithImages = async (req, res, next) => {
+  try {
+    console.log("✏️ updateEventWithImages chamado. Body:", req.body);
+    console.log("   req.files:", req.files);
+
+    const eventId = req.params.id;
+
+    // 1) Busca o evento existente
+    const event = await Event.findById(eventId);
+    if (!event) {
+      return next({ statusCode: 404, message: "Evento não encontrado" });
+    }
+
+    // (já passou por verifyToken + isEventOwner no router, mas não custa logar)
+    console.log("   Evento encontrado para update-with-images:", eventId);
+
+    // 2) Lê os campos básicos do body (strings, numbers etc)
+    const eventName = getField(req.body, "eventName")?.toString();
+    const description =
+      getField(req.body, "description")?.toString() ||
+      event.description ||
+      "Sem descrição informada.";
+    const date = getField(req.body, "date")?.toString() || event.date;
+
+    const startTimeStr = getField(req.body, "startTime");
+    const endTimeStr = getField(req.body, "endTime");
+
+    const startTime =
+      startTimeStr !== undefined ? Number(startTimeStr) : event.startTime;
+    const endTime =
+      endTimeStr !== undefined ? Number(endTimeStr) : event.endTime;
+
+    const location =
+      getField(req.body, "location")?.toString() || event.location;
+    const dressCode =
+      getField(req.body, "dressCode")?.toString() || event.dressCode || "Livre";
+    const price =
+      getField(req.body, "price")?.toString() || event.price || "0";
+
+    // 3) organizers (vem como JSON string no multipart)
+    const rawOrganizers = getField(req.body, "organizers");
+    let parsedOrganizers = event.organizers || [];
+    if (rawOrganizers) {
+      try {
+        parsedOrganizers = JSON.parse(rawOrganizers);
+      } catch (err) {
+        console.error("   Erro ao parsear organizers:", err);
+        return next({
+          statusCode: 400,
+          message: "Formato inválido para organizers. Envie um JSON válido.",
+        });
+      }
+    }
+
+    // 4) Lista de URLs a serem deletadas (imagens existentes)
+    const rawImagesToDelete = getField(req.body, "imagesToDelete");
+    let imagesToDelete = [];
+    if (rawImagesToDelete) {
+      try {
+        const parsed = JSON.parse(rawImagesToDelete);
+        if (Array.isArray(parsed)) {
+          imagesToDelete = parsed;
+        }
+      } catch (err) {
+        console.error("   Erro ao parsear imagesToDelete:", err);
+        return next({
+          statusCode: 400,
+          message: "Formato inválido para imagesToDelete. Envie um JSON válido.",
+        });
+      }
+    }
+    const imagesToDeleteSet = new Set(imagesToDelete);
+
+    // 5) Sobe novas imagens (se vierem arquivos)
+    const filesArray = Array.isArray(req.files) ? req.files : [];
+    const uploadedImages = [];
+    for (const file of filesArray) {
+      const uploaded = await uploadImageToGCS(file); // { publicUrl, filename }
+      uploadedImages.push({
+        url: uploaded.publicUrl,
+        filename: uploaded.filename,
+      });
+    }
+
+    // 6) Monta nova lista de imagens:
+    //    - mantém só as que NÃO estão na lista de delete
+    //    - adiciona as novas
+    const existingImages = Array.isArray(event.images) ? event.images : [];
+
+    const keptExistingImages = existingImages.filter(
+      (img) => img && img.url && !imagesToDeleteSet.has(img.url)
+    );
+
+    let coverImage = event.coverImage;
+
+    // se a capa atual estiver marcada pra deletar, zera
+    if (coverImage && coverImage.url && imagesToDeleteSet.has(coverImage.url)) {
+      coverImage = undefined;
+    }
+
+    // nova galeria final
+    const finalImages = [...keptExistingImages, ...uploadedImages];
+
+    // se não tiver capa, escolhe a primeira imagem da galeria
+    if (!coverImage && finalImages.length > 0) {
+      coverImage = finalImages[0];
+    }
+
+    // 7) Deletar do GCS as imagens removidas
+    const removedImages = existingImages.filter(
+      (img) => img && img.url && imagesToDeleteSet.has(img.url)
+    );
+    const filenamesToDelete = removedImages
+      .map((img) => img.filename)
+      .filter(Boolean);
+
+    if (event.coverImage && imagesToDeleteSet.has(event.coverImage.url)) {
+      if (event.coverImage.filename) {
+        filenamesToDelete.push(event.coverImage.filename);
+      }
+    }
+
+    setImmediate(async () => {
+      try {
+        await Promise.all(
+          filenamesToDelete.map((filename) => deleteImageFromGCS(filename))
+        );
+      } catch (err) {
+        console.error("⚠️ Erro ao deletar imagens do GCS (update):", err);
+      }
+    });
+
+    // 8) Monta objeto pra validar no Joi (UPDATE schema)
+    const eventDataForValidation = {
+      eventName,
+      description,
+      date,
+      startTime,
+      endTime,
+      location,
+      dressCode,
+      price,
+      organizers: parsedOrganizers,
+      coverImage,
+      images: finalImages,
+    };
+
+    const { error, value } = updateEventSchema.validate(
+      eventDataForValidation,
+      {
+        abortEarly: false,
+      }
+    );
+
+    if (error) {
+      console.error("   Erro de validação no update-with-images:", error.details);
+      return handleJoiError(
+        error,
+        next,
+        "Erro de validação ao atualizar evento com imagens"
+      );
+    }
+
+    // 9) Aplica as mudanças no documento
+    Object.assign(event, value);
+    await event.save();
+
+    const updatedEvent = await Event.findById(eventId);
+
+    console.log("✅ Evento atualizado com imagens:", updatedEvent._id);
+
+    return res.status(200).json({
+      message: "Evento atualizado com sucesso (imagens incluídas).",
+      evento: updatedEvent,
+    });
+  } catch (err) {
+    console.error("🔥 ERRO AO ATUALIZAR EVENTO COM IMAGENS:", err);
+    next({
+      statusCode: 500,
+      message: "Erro ao atualizar evento com imagens",
+      details: [err.message],
+    });
+  }
+};
+
+// ---------------------------------------------------------------------
 // Deletar evento + imagens do GCP
 // ---------------------------------------------------------------------
 const deleteEvent = async (req, res, next) => {
@@ -493,4 +681,5 @@ module.exports = {
   getImage,
   updateEvent,
   deleteEvent,
+  updateEventWithImages,
 };
