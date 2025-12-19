@@ -36,14 +36,11 @@ function getField(body, key) {
 // ---------------------------------------------------------------------
 const createEvent = async (req, res, next) => {
   try {
-    console.log("➡️ createEvent chamado");
-    console.log("   req.body:", req.body);
-
     const { error, value } = createEventSchema.validate(req.body, {
       abortEarly: false,
     });
     if (error) {
-      console.error("   Erro de validação:", error.details);
+      console.error("Erro de validação:", error.details);
       return handleJoiError(error, next, "Erro de validação ao criar evento");
     }
 
@@ -51,6 +48,9 @@ const createEvent = async (req, res, next) => {
 
     const newEvent = new Event({
       ...value,
+      address: value.address,
+      locationLabel: value.locationLabel,
+      geo: value.geo,
       price: value.price || "0",
       dressCode: value.dressCode || "Livre",
       description: value.description || "Sem descrição informada.",
@@ -149,7 +149,28 @@ const createEventWithImages = async (req, res, next) => {
 
     const startTime = startTimeStr ? Number(startTimeStr) : undefined;
     const endTime = endTimeStr ? Number(endTimeStr) : undefined;
-    const location = getField(req.body, "location")?.toString();
+    // address (vem como JSON string no multipart)
+    const rawAddress = getField(req.body, "address");
+    let parsedAddress;
+    if (rawAddress) {
+      try {
+        parsedAddress = typeof rawAddress === "string" ? JSON.parse(rawAddress) : rawAddress;
+      } catch (e) {
+        return next({ statusCode: 400, message: "Formato inválido para address (JSON)." });
+      }
+    }
+    
+    // geo (vem como JSON string no multipart)
+    const rawGeo = getField(req.body, "geo");
+    let parsedGeo;
+    if (rawGeo) {
+      try {
+        parsedGeo = typeof rawGeo === "string" ? JSON.parse(rawGeo) : rawGeo;
+      } catch (e) {
+        return next({ statusCode: 400, message: "Formato inválido para geo (JSON)." });
+      }
+    }
+    const locationLabel = getField(req.body, "locationLabel")?.toString();
     const dressCode = getField(req.body, "dressCode")?.toString() || "Livre";
     const price = getField(req.body, "price")?.toString() || "0";
 
@@ -174,7 +195,9 @@ const createEventWithImages = async (req, res, next) => {
       date,
       startTime,
       endTime,
-      location,
+      address: parsedAddress,
+      locationLabel,
+      geo: parsedGeo,
       dressCode,
       price,
       organizers: parsedorganizers,
@@ -420,7 +443,6 @@ const updateEventWithImages = async (req, res, next) => {
       return next({ statusCode: 404, message: "Evento não encontrado" });
     }
 
-    // (já passou por verifyToken + isEventOwner no router, mas não custa logar)
     console.log("   Evento encontrado para update-with-images:", eventId);
 
     // 2) Lê os campos básicos do body (strings, numbers etc)
@@ -439,8 +461,25 @@ const updateEventWithImages = async (req, res, next) => {
     const endTime =
       endTimeStr !== undefined ? Number(endTimeStr) : event.endTime;
 
-    const location =
-      getField(req.body, "location")?.toString() || event.location;
+    const rawAddress = getField(req.body, "address");
+    let parsedAddress = event.address;
+    if (rawAddress) {
+      try {
+        parsedAddress = typeof rawAddress === "string" ? JSON.parse(rawAddress) : rawAddress;
+      } catch (e) {
+        return next({ statusCode: 400, message: "Formato inválido para address (JSON)." });
+      }
+    }
+    const rawGeo = getField(req.body, "geo");
+    let parsedGeo = event.geo;
+    if (rawGeo) {
+      try {
+        parsedGeo = typeof rawGeo === "string" ? JSON.parse(rawGeo) : rawGeo;
+      } catch (e) {
+        return next({ statusCode: 400, message: "Formato inválido para geo (JSON)." });
+      }
+    }
+    const locationLabel = getField(req.body, "locationLabel")?.toString() || event.locationLabel;
     const dressCode =
       getField(req.body, "dressCode")?.toString() || event.dressCode || "Livre";
     const price =
@@ -546,7 +585,9 @@ const updateEventWithImages = async (req, res, next) => {
       date,
       startTime,
       endTime,
-      location,
+      address: parsedAddress,
+      locationLabel,
+      geo: parsedGeo,
       dressCode,
       price,
       organizers: parsedOrganizers,
@@ -570,7 +611,6 @@ const updateEventWithImages = async (req, res, next) => {
       );
     }
 
-    // 9) Aplica as mudanças no documento
     Object.assign(event, value);
     await event.save();
 

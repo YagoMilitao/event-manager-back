@@ -1,5 +1,21 @@
 const Joi = require("joi");
 
+const addressSchema = Joi.object({
+  cep: Joi.string().allow("", null),
+  street: Joi.string().required(),
+  number: Joi.string().required(),
+  neighborhood: Joi.string().allow("", null),
+  city: Joi.string().required(),
+  state: Joi.string().required(),
+  complement: Joi.string().allow("", null),
+});
+
+const geoSchema = Joi.object({
+  lat: Joi.number().required(),
+  lng: Joi.number().required(),
+});
+
+
 // 🔹 Schema de organizador
 const organizerSchema = Joi.object({
   organizerName: Joi.string().min(1).required().messages({
@@ -17,7 +33,6 @@ const organizerSchema = Joi.object({
 
 // 🔹 Schema de imagem salva no GCP
 const imageSchema = Joi.object({
-  // deixamos BEM simples pra não dar erro com URL do GCS
   url: Joi.string().required().messages({
     "any.required": "URL da imagem é obrigatória.",
     "string.empty": "URL da imagem é obrigatória.",
@@ -30,7 +45,6 @@ const imageSchema = Joi.object({
 
 // 🔹 CREATE
 const createEventSchema = Joi.object({
-  // ⚠️ IMPORTANTE: aqui a chave é "eventName" (é isso que o controller usa)
   eventName: Joi.string().min(3).max(120).required().messages({
     "any.required": "O título é obrigatório.",
     "string.empty": "O título é obrigatório.",
@@ -54,12 +68,9 @@ const createEventSchema = Joi.object({
   }),
 
   endTime: Joi.number().integer().min(0).max(2359).optional().allow(null),
-
-  location: Joi.string().min(3).required().messages({
-    "any.required": "O local é obrigatório.",
-    "string.empty": "O local é obrigatório.",
-  }),
-
+  address: addressSchema.required(),
+  locationLabel: Joi.string().required(),
+  geo: geoSchema.optional(),
   price: Joi.string()
     .pattern(/^\d+(\.\d{1,2})?$/)
     .allow("", null)
@@ -96,7 +107,9 @@ const updateEventSchema = Joi.object({
   date: Joi.string().allow("", null),
   startTime: Joi.number().integer().min(0).max(2359),
   endTime: Joi.number().integer().min(0).max(2359).allow(null),
-  location: Joi.string().min(3),
+  address: addressSchema.required(),
+  locationLabel: Joi.string().required(),
+  geo: geoSchema.optional(),
   price: Joi.string()
     .pattern(/^\d+(\.\d{1,2})?$/)
     .allow("", null)

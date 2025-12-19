@@ -58,10 +58,19 @@ const EventSchema = new mongoose.Schema(
       type: String,
       default: "Livre",
     },
-    location: {
-      type: String,
-      required: true,
-      minlength: 3,
+    address: {
+     cep: String,
+     street: String,
+     number: String,
+     neighborhood: String,
+     city: String,
+     state: String,
+     complement: String,
+    },
+    locationLabel: String,
+    geo: {
+     lat: Number,
+     lng: Number,
     },
     price: {
       type: String,

@@ -8,9 +8,6 @@ const STORAGE_BUCKET = process.env.STORAGE_BUCKET;
 
 if (!PROJECT_ID || !CLIENT_EMAIL || !PRIVATE_KEY) {
   console.error("❌ Variáveis de ambiente do Firebase não configuradas corretamente.");
-  console.log("PROJECT_ID:", PROJECT_ID );
-  console.log("CLIENT_EMAIL:", CLIENT_EMAIL );
-  console.log("PRIVATE_KEY:", PRIVATE_KEY ? "****" : null);
   throw new Error("Firebase env vars missing");
 }
 
