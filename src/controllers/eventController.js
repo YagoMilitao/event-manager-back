@@ -58,10 +58,10 @@ const createEvent = async (req, res, next) => {
       creator: req.user.uid,
     });
 
-    console.log("   Evento a ser salvo:", newEvent);
+    console.log("Evento a ser salvo:", newEvent);
 
     const savedEvent = await newEvent.save();
-    console.log("   Evento salvo com sucesso:", savedEvent);
+    console.log("Evento salvo com sucesso:", savedEvent);
 
     const htmlContent = generateEventCreatedEmail(
       req.user.uid,
