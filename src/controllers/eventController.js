@@ -149,7 +149,17 @@ const createEventWithImages = async (req, res, next) => {
 
     const startTime = startTimeStr ? Number(startTimeStr) : undefined;
     const endTime = endTimeStr ? Number(endTimeStr) : undefined;
-    const location = getField(req.body, "location")?.toString();
+    const rawAddress = getField(req.body, "address");
+    let address;
+    if (rawAddress) {
+      try {
+        address = typeof rawAddress === "string" ? JSON.parse(rawAddress) : rawAddress;
+      } catch (e) {
+        return next({ statusCode: 400, message: "Formato inválido para address." });
+      }
+    }
+
+    const locationLabel = getField(req.body, "locationLabel")?.toString();
     const dressCode = getField(req.body, "dressCode")?.toString() || "Livre";
     const price = getField(req.body, "price")?.toString() || "0";
 
