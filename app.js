@@ -33,6 +33,7 @@ app.use(cors({
     "http://10.0.2.2:3000",
     "https://event-manager-back.onrender.com",
     "https://event-manager-front-two.vercel.app",
+    "https://event-manager-front-two.vercel.app",
   ], // ajustar conforme o frontend
   methods: [
     "GET",
